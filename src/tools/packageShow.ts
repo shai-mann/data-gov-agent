@@ -40,6 +40,8 @@ interface PackageDetails {
  */
 export const packageShow = tool(
   async ({ packageId }) => {
+    console.log(`📦 Package Show - Package ID: ${packageId}`);
+
     try {
       const baseUrl = 'https://catalog.data.gov/api/3/action';
       const showUrl = `${baseUrl}/package_show`;
@@ -48,6 +50,7 @@ export const packageShow = tool(
         id: packageId,
       });
 
+      console.log(`📡 Package Show - Fetching: ${showUrl}?${params}`);
       const response = await fetch(`${showUrl}?${params}`);
 
       if (!response.ok) {
@@ -82,11 +85,13 @@ export const packageShow = tool(
         last_modified: data.result.last_modified || '',
       };
 
+      console.log(`✅ Package Show - Retrieved: "${packageData.title}"`);
       return {
         success: true,
         package: packageData,
       };
     } catch (error) {
+      console.log(`❌ Package Show - Error:`, error);
       return {
         success: false,
         error:

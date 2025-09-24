@@ -15,6 +15,10 @@ interface EvaluationResult {
  */
 export const datasetEvaluation = tool(
   async ({ datasetMetadata, userQuery, datasetPreview }) => {
+    console.log(
+      `🔍 Dataset Evaluation - Query: "${userQuery}", Dataset: "${datasetMetadata?.title || 'Unknown'}"`
+    );
+
     try {
       // This is a stub implementation for dataset evaluation
       // In a real implementation, you would use an LLM to evaluate:
@@ -41,18 +45,15 @@ export const datasetEvaluation = tool(
         relevance_score: 0.9,
       };
 
-      // In a real implementation, you would:
-      // 1. Use an LLM to analyze the dataset metadata against the user query
-      // 2. Evaluate data quality indicators
-      // 3. Check for completeness and recency
-      // 4. Assess format and accessibility
-      // 5. Provide specific reasons and suggestions
-
+      console.log(
+        `✅ Dataset Evaluation - Suitable: ${mockEvaluation.is_suitable}, Confidence: ${mockEvaluation.confidence_score}`
+      );
       return {
         success: true,
         evaluation: mockEvaluation,
       };
     } catch (error) {
+      console.log(`❌ Dataset Evaluation - Error:`, error);
       return {
         success: false,
         error:

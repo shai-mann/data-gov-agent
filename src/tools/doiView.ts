@@ -17,6 +17,8 @@ interface DOIInfo {
  */
 export const doiView = tool(
   async ({ doi }) => {
+    console.log(`🔗 DOI View - DOI: ${doi}`);
+
     try {
       // For now, we'll simulate DOI resolution
       // In a real implementation, you would integrate with DOI resolution services
@@ -35,16 +37,13 @@ export const doiView = tool(
         citation: `Dataset Title (DOI Resolution). Data.gov. ${new Date().getFullYear()}. https://doi.org/${doi}`,
       };
 
-      // In a real implementation, you would:
-      // 1. Make a request to a DOI resolution service
-      // 2. Parse the response to extract metadata
-      // 3. Return the structured DOI information
-
+      console.log(`✅ DOI View - Retrieved info for: ${doi}`);
       return {
         success: true,
         doi_info: mockDOIInfo,
       };
     } catch (error) {
+      console.log(`❌ DOI View - Error:`, error);
       return {
         success: false,
         error:

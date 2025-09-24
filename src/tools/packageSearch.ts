@@ -20,6 +20,10 @@ interface PackageSearchResult {
  */
 export const packageSearch = tool(
   async ({ query, limit = 10, offset = 0 }) => {
+    console.log(
+      `🔍 Package Search - Query: "${query}", Limit: ${limit}, Offset: ${offset}`
+    );
+
     try {
       const baseUrl = 'https://catalog.data.gov/api/3/action';
       const searchUrl = `${baseUrl}/package_search`;
@@ -31,6 +35,7 @@ export const packageSearch = tool(
         sort: 'score desc, metadata_modified desc',
       });
 
+      console.log(`📡 Package Search - Fetching: ${searchUrl}?${params}`);
       const response = await fetch(`${searchUrl}?${params}`);
 
       if (!response.ok) {
@@ -54,6 +59,7 @@ export const packageSearch = tool(
         })
       );
 
+      console.log(`✅ Package Search - Found ${results.length} results`);
       return {
         success: true,
         count: data.result.count,
@@ -61,6 +67,7 @@ export const packageSearch = tool(
         query: query,
       };
     } catch (error) {
+      console.log(`❌ Package Search - Error:`, error);
       return {
         success: false,
         error:

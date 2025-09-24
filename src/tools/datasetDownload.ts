@@ -17,6 +17,10 @@ interface DatasetPreview {
  */
 export const datasetDownload = tool(
   async ({ resourceUrl, resourceId, format = 'auto' }) => {
+    console.log(
+      `📥 Dataset Download - Resource ID: ${resourceId}, URL: ${resourceUrl}, Format: ${format}`
+    );
+
     try {
       // For now, we'll simulate dataset download and preview
       // In a real implementation, you would:
@@ -41,18 +45,15 @@ export const datasetDownload = tool(
         sample_size: 3,
       };
 
-      // In a real implementation, you would:
-      // 1. Fetch the resource URL
-      // 2. Parse the data based on format
-      // 3. Extract first 100 rows
-      // 4. Identify column names/types
-      // 5. Return structured preview
-
+      console.log(
+        `✅ Dataset Download - Preview generated with ${mockPreview.total_rows} total rows, ${mockPreview.sample_size} sample rows`
+      );
       return {
         success: true,
         preview: mockPreview,
       };
     } catch (error) {
+      console.log(`❌ Dataset Download - Error:`, error);
       return {
         success: false,
         error:
