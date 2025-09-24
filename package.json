@@ -1,7 +1,7 @@
 {
   "name": "data-gov-agent",
   "version": "1.0.0",
-  "description": "A Hono microservice with Bun",
+  "description": "An agentic microservice for answering NL questions about US government datasets",
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
@@ -16,10 +16,11 @@
     "type-check": "tsc --noEmit"
   },
   "keywords": [
-    "hono",
-    "bun",
+    "agentic",
     "microservice",
-    "api"
+    "api",
+    "us government",
+    "datasets"
   ],
   "author": "Shai Mann <shai-mann>",
   "dependencies": {

@@ -101,15 +101,6 @@ This project is configured for seamless deployment to Vercel's serverless platfo
 bun run deploy:vercel
 ```
 
-### Zero-Config Deployment
-
-- **Automatic Detection** - Vercel automatically detects the configuration
-- **GitHub Integration** - Connect your repo for automatic deployments
-- **Preview Deployments** - Every PR gets a preview URL
-- **Edge Functions** - Global distribution for optimal performance
-
-For detailed deployment instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md).
-
 ## Environment Variables
 
 - `PORT` - Server port (default: 3000)
