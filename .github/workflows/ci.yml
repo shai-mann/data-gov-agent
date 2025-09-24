@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  lint-and-format:
+    name: Lint and Format Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Type check
+        run: bun run type-check
+
+      - name: Lint check
+        run: bun run lint
+
+      - name: Format check
+        run: bun run format:check
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build project
+        run: bun run build
+
+      - name: Run tests
+        run: bun run test
+        env:
+          OPENAI_API_KEY: '' # Unnecessary because network requests should be recorded locally
+
+      - name: Test server startup
+        run: |
+          # Start server in background
+          bun run start &
+          SERVER_PID=$!
+
+          # Wait for server to start
+          sleep 5
+
+          # Test health endpoint
+          curl -f http://localhost:3000/v1/health || exit 1
+
+          # Clean up
+          kill $SERVER_PID

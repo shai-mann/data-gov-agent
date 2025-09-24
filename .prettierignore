@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.min.js
+*.min.css
+.git/
+.env
+.env.local
+.env.production
+.env.development

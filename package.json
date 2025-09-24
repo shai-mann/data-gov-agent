@@ -1,5 +1,5 @@
 {
-  "name": "apartours-agent",
+  "name": "data-gov-agent",
   "version": "1.0.0",
   "description": "A Hono microservice with Bun",
   "type": "module",
@@ -21,7 +21,7 @@
     "microservice",
     "api"
   ],
-  "author": "Ghost Software <contact@ghostsoftware.co>",
+  "author": "Shai Mann <shai-mann>",
   "dependencies": {
     "@langchain/core": "^1.0.0-alpha.3",
     "@langchain/langgraph": "^1.0.0-alpha.1",

@@ -1,6 +1,6 @@
-# Apartours Agent
+# Data Gov Agent
 
-[![CI](https://github.com/ghostsoftwareco/apartours-agent/workflows/CI/badge.svg)](https://github.com/ghostsoftwareco/apartours-agent/actions)
+[![CI](https://github.com/shai-mann/data-gov-agent/workflows/CI/badge.svg)](https://github.com/shai-mann/data-gov-agent/actions)
 
 A modern microservice built with Hono and Bun, featuring TypeScript, ESLint, and Prettier.
 
