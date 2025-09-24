@@ -42,7 +42,7 @@ export const packageSearch = tool(
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as any;
 
       if (!data.success) {
         throw new Error(`API error: ${data.error?.message || 'Unknown error'}`);

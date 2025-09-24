@@ -4,3 +4,4 @@ export { packageShow } from './packageShow';
 export { doiView } from './doiView';
 export { datasetDownload } from './datasetDownload';
 export { datasetEvaluation } from './datasetEvaluation';
+export { selectDataset } from './selectDataset';
