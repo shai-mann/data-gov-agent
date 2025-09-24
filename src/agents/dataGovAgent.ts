@@ -1,4 +1,6 @@
 import { MessagesAnnotation, StateGraph } from '@langchain/langgraph';
+import { ToolNode } from 'langchain';
+import { AIMessage } from '@langchain/core/messages';
 import {
   packageSearch,
   packageShow,
@@ -10,13 +12,8 @@ import { openai } from '../llms';
 
 // Extended state to track data-gov specific information
 type DataGovState = typeof MessagesAnnotation.State & {
-  searchResults?: any[];
-  currentPackage?: any;
-  datasetPreview?: any;
-  evaluationResult?: any;
-  selectedDataset?: any;
+  selectedDataset?: unknown;
   userQuery?: string;
-  searchAttempts?: number;
 };
 
 // Set up tool calling
@@ -28,343 +25,119 @@ const tools = [
   datasetEvaluation,
 ];
 
-openai.bindTools(tools);
+const llmWithTools = openai.bindTools(tools);
 
-// Node 1: Package Search
-async function packageSearchNode(state: DataGovState) {
+// Main LLM node that can access all dataset-finding tools
+async function datasetFindingNode(state: DataGovState) {
   const messages = state.messages;
   const lastMessage = messages.at(-1);
 
   if (!lastMessage || lastMessage.type !== 'user') {
-    throw new Error('No user message found for package search');
+    throw new Error('No user message found for dataset finding');
   }
 
   const userQuery = lastMessage.content as string;
 
-  // Use the package search tool
-  const searchResult = await packageSearch.invoke({
-    query: userQuery,
-    limit: 10,
-  });
+  const result = await llmWithTools.invoke([
+    {
+      role: 'system',
+      content: `You are a data.gov assistant that helps users find and evaluate datasets from the U.S. government's open data portal.
+
+Available tools:
+- packageSearch: Search for datasets using keywords
+- packageShow: Get detailed metadata for a specific dataset
+- doiView: View DOI information if available
+- datasetDownload: Download and preview dataset (first 100 rows)
+- datasetEvaluation: Evaluate if a dataset is suitable for the user's query
+
+Your workflow:
+1. Search for datasets matching the user's query using packageSearch
+2. Get detailed information about promising candidates using packageShow
+3. View DOI information if available using doiView
+4. Download and preview the dataset using datasetDownload
+5. Evaluate if it's suitable for the user's needs using datasetEvaluation
+6. If suitable, provide a clear summary and mark it as selected
+7. If not suitable, search for alternatives or explain why
+
+When you find a suitable dataset, provide a clear summary with:
+- Dataset title and description
+- Organization that published it
+- Last modified date
+- Available resources and download links
+- Why it's suitable for the user's query
+
+Be thorough in your evaluation and helpful in your explanations.`,
+    },
+    ...state.messages,
+  ]);
 
   return {
     ...state,
     userQuery,
-    searchResults: searchResult.success ? searchResult.results : [],
-    searchAttempts: (state.searchAttempts || 0) + 1,
-    messages: [
-      ...messages,
-      {
-        role: 'assistant',
-        content: `Found ${searchResult.success ? searchResult.results.length : 0} datasets matching "${userQuery}". Let me get more details about the most relevant ones.`,
-      },
-    ],
+    messages: [result],
   };
 }
 
-// Node 2: Package Show (Get detailed metadata)
-async function packageShowNode(state: DataGovState) {
+// Tool node for executing tool calls
+const toolNode = new ToolNode(tools);
+
+// Final result node (for now, just returns the selected dataset)
+async function finalResultNode(state: DataGovState) {
   const messages = state.messages;
-  const searchResults = state.searchResults || [];
-
-  if (searchResults.length === 0) {
-    return {
-      ...state,
-      messages: [
-        ...messages,
-        {
-          role: 'assistant',
-          content:
-            'No datasets found for your query. Please try a different search term.',
-        },
-      ],
-    };
-  }
-
-  // Get details for the first (most relevant) package
-  const firstPackage = searchResults[0];
-  const packageDetails = await packageShow.invoke({
-    packageId: firstPackage.id,
-  });
+  const lastMessage = messages.at(-1);
 
   return {
     ...state,
-    currentPackage: packageDetails.success ? packageDetails.package : null,
+    selectedDataset: lastMessage?.content || null,
     messages: [
       ...messages,
       {
         role: 'assistant',
-        content: `Retrieved detailed information for "${firstPackage.title}". ${packageDetails.success ? 'Let me evaluate if this dataset is suitable for your needs.' : 'Failed to retrieve package details.'}`,
+        content:
+          'Dataset selection complete. Here are the results from your search.',
       },
     ],
   };
 }
 
-// Node 3: DOI View (if needed)
-async function doiViewNode(state: DataGovState) {
+// Simple conditional edge function
+function shouldContinue(state: DataGovState) {
   const messages = state.messages;
-  const currentPackage = state.currentPackage;
+  const lastMessage = messages.at(-1) as AIMessage;
 
-  if (!currentPackage) {
-    return {
-      ...state,
-      messages: [
-        ...messages,
-        {
-          role: 'assistant',
-          content: 'No package details available for DOI view.',
-        },
-      ],
-    };
+  // If the LLM makes a tool call, execute the tool
+  if (lastMessage.tool_calls && lastMessage.tool_calls.length > 0) {
+    return 'toolNode';
   }
 
-  // Look for DOI in extras
-  const doiExtra = currentPackage.extras?.find(
-    (extra: any) =>
-      extra.key.toLowerCase().includes('doi') ||
-      extra.key.toLowerCase().includes('identifier')
-  );
-
-  if (!doiExtra) {
-    return {
-      ...state,
-      messages: [
-        ...messages,
-        {
-          role: 'assistant',
-          content:
-            'No DOI found for this dataset. Proceeding to dataset download and preview.',
-        },
-      ],
-    };
-  }
-
-  const doiResult = await doiView.invoke({ doi: doiExtra.value });
-
-  return {
-    ...state,
-    messages: [
-      ...messages,
-      {
-        role: 'assistant',
-        content: `DOI Information: ${doiResult.success ? `Title: ${doiResult.doi_info?.title}, Citation: ${doiResult.doi_info?.citation}` : 'Failed to retrieve DOI information.'}`,
-      },
-    ],
-  };
-}
-
-// Node 4: Dataset Download and Preview
-async function datasetDownloadNode(state: DataGovState) {
-  const messages = state.messages;
-  const currentPackage = state.currentPackage;
-
+  // If the LLM has finished and provided a result, move to final result
   if (
-    !currentPackage ||
-    !currentPackage.resources ||
-    currentPackage.resources.length === 0
+    lastMessage.content &&
+    typeof lastMessage.content === 'string' &&
+    lastMessage.content.includes('✅ Selected dataset:')
   ) {
-    return {
-      ...state,
-      messages: [
-        ...messages,
-        {
-          role: 'assistant',
-          content: 'No downloadable resources found for this dataset.',
-        },
-      ],
-    };
+    return 'finalResult';
   }
 
-  // Use the first available resource
-  const resource = currentPackage.resources[0];
-  const downloadResult = await datasetDownload.invoke({
-    resourceUrl: resource.url,
-    resourceId: resource.id,
-    format: resource.format,
-  });
-
-  return {
-    ...state,
-    datasetPreview: downloadResult.success ? downloadResult.preview : null,
-    messages: [
-      ...messages,
-      {
-        role: 'assistant',
-        content: `Dataset preview: ${downloadResult.success ? `Found ${downloadResult.preview?.total_rows || 0} rows with columns: ${downloadResult.preview?.columns?.join(', ') || 'unknown'}` : 'Failed to download dataset preview.'}`,
-      },
-    ],
-  };
-}
-
-// Node 5: Dataset Evaluation
-async function datasetEvaluationNode(state: DataGovState) {
-  const messages = state.messages;
-  const currentPackage = state.currentPackage;
-  const datasetPreview = state.datasetPreview;
-  const userQuery = state.userQuery;
-
-  if (!currentPackage || !userQuery) {
-    return {
-      ...state,
-      messages: [
-        ...messages,
-        {
-          role: 'assistant',
-          content:
-            'Cannot evaluate dataset without package details or user query.',
-        },
-      ],
-    };
-  }
-
-  const evaluationResult = await datasetEvaluation.invoke({
-    datasetMetadata: currentPackage,
-    userQuery,
-    datasetPreview,
-  });
-
-  return {
-    ...state,
-    evaluationResult: evaluationResult.success
-      ? evaluationResult.evaluation
-      : null,
-    messages: [
-      ...messages,
-      {
-        role: 'assistant',
-        content: `Dataset evaluation: ${
-          evaluationResult.success
-            ? `Suitability: ${evaluationResult.evaluation?.is_suitable ? 'Yes' : 'No'}, Confidence: ${evaluationResult.evaluation?.confidence_score || 0}`
-            : 'Failed to evaluate dataset.'
-        }`,
-      },
-    ],
-  };
-}
-
-// Node 6: Select Dataset and Return
-async function selectDatasetNode(state: DataGovState) {
-  const messages = state.messages;
-  const currentPackage = state.currentPackage;
-  const evaluationResult = state.evaluationResult;
-
-  if (!currentPackage) {
-    return {
-      ...state,
-      messages: [
-        ...messages,
-        {
-          role: 'assistant',
-          content: 'No dataset selected. Please try a different search.',
-        },
-      ],
-    };
-  }
-
-  const isSuitable = evaluationResult?.is_suitable || false;
-
-  return {
-    ...state,
-    selectedDataset: isSuitable ? currentPackage : null,
-    messages: [
-      ...messages,
-      {
-        role: 'assistant',
-        content: isSuitable
-          ? `✅ Selected dataset: "${currentPackage.title}"\n\n` +
-            `📊 Organization: ${currentPackage.organization?.title || 'Unknown'}\n` +
-            `📅 Last Modified: ${currentPackage.last_modified || 'Unknown'}\n` +
-            `📋 Resources: ${currentPackage.resources?.length || 0} available\n` +
-            `🔗 Access the dataset at: ${currentPackage.resources?.[0]?.url || 'No URL available'}`
-          : `❌ The dataset "${currentPackage.title}" is not suitable for your query. Let me search for alternatives.`,
-      },
-    ],
-  };
-}
-
-// Conditional edge functions
-function shouldGetPackageDetails(state: DataGovState) {
-  const searchResults = state.searchResults || [];
-  return searchResults.length > 0 ? 'packageShow' : '__end__';
-}
-
-function hasEnoughInfo(state: DataGovState) {
-  const currentPackage = state.currentPackage;
-  const hasResources =
-    currentPackage?.resources && currentPackage.resources.length > 0;
-  const hasDOI = currentPackage?.extras?.some(
-    (extra: any) =>
-      extra.key.toLowerCase().includes('doi') ||
-      extra.key.toLowerCase().includes('identifier')
-  );
-
-  // If we have resources, we can proceed to download
-  // If we only have DOI, we should view DOI first
-  return hasResources ? 'datasetDownload' : hasDOI ? 'doiView' : '__end__';
-}
-
-function shouldViewDOI(state: DataGovState) {
-  const currentPackage = state.currentPackage;
-  const hasDOI = currentPackage?.extras?.some(
-    (extra: any) =>
-      extra.key.toLowerCase().includes('doi') ||
-      extra.key.toLowerCase().includes('identifier')
-  );
-
-  return hasDOI ? 'doiView' : 'datasetDownload';
-}
-
-function shouldEvaluateDataset(state: DataGovState) {
-  const datasetPreview = state.datasetPreview;
-  return datasetPreview ? 'datasetEvaluation' : '__end__';
-}
-
-function isDatasetSuitable(state: DataGovState) {
-  const evaluationResult = state.evaluationResult;
-  const searchAttempts = state.searchAttempts || 0;
-
-  if (evaluationResult?.is_suitable) {
-    return 'selectDataset';
-  }
-
-  // If not suitable and we haven't tried too many times, search again
-  if (searchAttempts < 3) {
-    return 'packageSearch';
-  }
-
-  return 'selectDataset'; // Give up and return what we have
+  // Otherwise, return to the LLM
+  return 'llmNode';
 }
 
 // Build the data-gov agent workflow
 const dataGovAgent = new StateGraph(MessagesAnnotation)
-  .addNode('packageSearch', packageSearchNode)
-  .addNode('packageShow', packageShowNode)
-  .addNode('doiView', doiViewNode)
-  .addNode('datasetDownload', datasetDownloadNode)
-  .addNode('datasetEvaluation', datasetEvaluationNode)
-  .addNode('selectDataset', selectDatasetNode)
+  .addNode('llmNode', datasetFindingNode)
+  .addNode('toolNode', toolNode)
+  .addNode('finalResult', finalResultNode)
 
   // Add edges
-  .addEdge('__start__', 'packageSearch')
-  .addConditionalEdges('packageSearch', shouldGetPackageDetails, [
-    'packageShow',
-    '__end__',
+  .addEdge('__start__', 'llmNode')
+  .addConditionalEdges('llmNode', shouldContinue, [
+    'toolNode',
+    'finalResult',
+    'llmNode',
   ])
-  .addConditionalEdges('packageShow', hasEnoughInfo, [
-    'doiView',
-    'datasetDownload',
-    '__end__',
-  ])
-  .addConditionalEdges('doiView', shouldViewDOI, ['datasetDownload'])
-  .addConditionalEdges('datasetDownload', shouldEvaluateDataset, [
-    'datasetEvaluation',
-    '__end__',
-  ])
-  .addConditionalEdges('datasetEvaluation', isDatasetSuitable, [
-    'selectDataset',
-    'packageSearch',
-  ])
-  .addEdge('selectDataset', '__end__')
+  .addEdge('toolNode', 'llmNode')
+  .addEdge('finalResult', '__end__')
 
   .compile();
 

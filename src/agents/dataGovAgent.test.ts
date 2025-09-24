@@ -26,7 +26,7 @@ describe('Data Gov Agent with Nock replay', () => {
     });
 
     expect(redactInvocationIds(result)).toMatchSnapshot();
-  });
+  }, 30000); // Increased timeout for LLM calls
 
   it('searches for economic data', async () => {
     const result = await dataGovAgent.invoke({
@@ -39,7 +39,7 @@ describe('Data Gov Agent with Nock replay', () => {
     });
 
     expect(redactInvocationIds(result)).toMatchSnapshot();
-  });
+  }, 30000); // Increased timeout for LLM calls
 
   it('handles empty search results', async () => {
     const result = await dataGovAgent.invoke({
@@ -52,7 +52,7 @@ describe('Data Gov Agent with Nock replay', () => {
     });
 
     expect(redactInvocationIds(result)).toMatchSnapshot();
-  });
+  }, 30000); // Increased timeout for LLM calls
 
   it('stores an agent graph', async () => {
     const pngBuffer = await exportGraphPNG(dataGovAgent);

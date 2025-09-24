@@ -72,14 +72,25 @@ bun run type-check
 
 ### Data.gov Agent
 
-The data.gov agent helps users find and evaluate datasets from the U.S. government's open data portal. It follows a structured workflow:
+The data.gov agent helps users find and evaluate datasets from the U.S. government's open data portal. It uses a single LLM node with access to all dataset-finding tools, allowing for flexible and intelligent dataset discovery.
 
-1. **Package Search** - Searches for datasets using keywords
-2. **Package Show** - Retrieves detailed metadata for candidate datasets
-3. **DOI View** - Shows DOI information if available
-4. **Dataset Download** - Downloads and previews the first 100 rows
-5. **Dataset Evaluation** - Evaluates if the dataset is suitable for the user's query
-6. **Select Dataset** - Returns the most suitable dataset
+**Available Tools:**
+
+- **Package Search** - Searches for datasets using keywords
+- **Package Show** - Retrieves detailed metadata for specific datasets
+- **DOI View** - Shows DOI information if available
+- **Dataset Download** - Downloads and previews the first 100 rows
+- **Dataset Evaluation** - Evaluates if a dataset is suitable for the user's query
+
+**Workflow:**
+The LLM intelligently uses these tools to:
+
+1. Search for datasets matching the user's query
+2. Get detailed information about promising candidates
+3. View DOI information if available
+4. Download and preview datasets
+5. Evaluate suitability and provide recommendations
+6. Return the best match or search for alternatives
 
 #### Usage
 
