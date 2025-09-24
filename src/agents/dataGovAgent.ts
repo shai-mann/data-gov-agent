@@ -28,7 +28,7 @@ const tools = [
 const llmWithTools = openai.bindTools(tools);
 
 // Entry node - extracts user query once
-async function extractUserQueryNode(state: DataGovState) {
+async function setupNode(state: DataGovState) {
   const messages = state.messages;
   const lastMessage = messages.at(-1);
 
@@ -130,14 +130,14 @@ function shouldContinue(state: DataGovState) {
 
 // Build the data-gov agent workflow
 const dataGovAgent = new StateGraph(MessagesAnnotation)
-  .addNode('extractQuery', extractUserQueryNode)
+  .addNode('setup', setupNode)
   .addNode('llmNode', datasetFindingNode)
   .addNode('toolNode', toolNode)
   .addNode('finalResult', finalResultNode)
 
   // Add edges
-  .addEdge('__start__', 'extractQuery')
-  .addEdge('extractQuery', 'llmNode')
+  .addEdge('__start__', 'setup')
+  .addEdge('setup', 'llmNode')
   .addConditionalEdges('llmNode', shouldContinue, [
     'toolNode',
     'finalResult',
