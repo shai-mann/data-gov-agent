@@ -1,6 +1,6 @@
 import { MessagesAnnotation, StateGraph } from '@langchain/langgraph';
 import { ToolNode } from 'langchain';
-import { AIMessage } from '@langchain/core/messages';
+import { AIMessage, HumanMessage } from '@langchain/core/messages';
 import {
   packageSearch,
   packageShow,
@@ -29,14 +29,20 @@ const llmWithTools = openai.bindTools(tools);
 
 // Main LLM node that can access all dataset-finding tools
 async function datasetFindingNode(state: DataGovState) {
-  const messages = state.messages;
-  const lastMessage = messages.at(-1);
+  // Extract and confirm that a userQuery exists
+  let userQuery = state.userQuery;
 
-  if (!lastMessage || lastMessage.type !== 'user') {
-    throw new Error('No user message found for dataset finding');
+  // If no existing userQuery, extract it from the last message
+  if (!userQuery) {
+    const messages = state.messages;
+    const lastMessage = messages.at(-1);
+
+    if (!lastMessage || !(lastMessage instanceof HumanMessage)) {
+      throw new Error('No user message found for dataset finding');
+    }
+
+    userQuery = lastMessage?.content as string;
   }
-
-  const userQuery = lastMessage.content as string;
 
   const result = await llmWithTools.invoke([
     {
