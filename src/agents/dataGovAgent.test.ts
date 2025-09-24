@@ -1,0 +1,61 @@
+import { describe, beforeAll, afterAll, it, expect } from 'vitest';
+import { setupNock } from '../../test/nockSetup';
+import dataGovAgent from './dataGovAgent';
+import redactInvocationIds from '../../test/redactInvocationIds';
+import exportGraphPNG from './helpers/exportGraphPNG';
+
+describe('Data Gov Agent with Nock replay', () => {
+  let nockHelper: ReturnType<typeof setupNock>;
+
+  beforeAll(() => {
+    nockHelper = setupNock('data-gov-agent');
+  });
+
+  afterAll(() => {
+    nockHelper?.stop();
+  });
+
+  it('searches for climate change datasets', async () => {
+    const result = await dataGovAgent.invoke({
+      messages: [
+        {
+          role: 'user',
+          content: 'Find datasets about climate change',
+        },
+      ],
+    });
+
+    expect(redactInvocationIds(result)).toMatchSnapshot();
+  });
+
+  it('searches for economic data', async () => {
+    const result = await dataGovAgent.invoke({
+      messages: [
+        {
+          role: 'user',
+          content: 'I need economic indicators data',
+        },
+      ],
+    });
+
+    expect(redactInvocationIds(result)).toMatchSnapshot();
+  });
+
+  it('handles empty search results', async () => {
+    const result = await dataGovAgent.invoke({
+      messages: [
+        {
+          role: 'user',
+          content: 'xyz123nonexistentdata',
+        },
+      ],
+    });
+
+    expect(redactInvocationIds(result)).toMatchSnapshot();
+  });
+
+  it('stores an agent graph', async () => {
+    const pngBuffer = await exportGraphPNG(dataGovAgent);
+    expect(pngBuffer).toMatchImageSnapshot();
+  });
+});

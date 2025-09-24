@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import dataGovAgent from './agents/dataGovAgent';
 
 const app = new Hono();
 
@@ -8,6 +9,42 @@ const v1 = new Hono();
 // Health check endpoint
 v1.get('/health', c => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Data Gov Agent endpoint
+v1.post('/data-gov/search', async c => {
+  try {
+    const { query } = await c.req.json();
+
+    if (!query) {
+      return c.json({ error: 'Query parameter is required' }, 400);
+    }
+
+    const result = await dataGovAgent.invoke({
+      messages: [
+        {
+          role: 'user',
+          content: query,
+        },
+      ],
+    });
+
+    return c.json({
+      success: true,
+      result: result,
+      query: query,
+    });
+  } catch (error) {
+    console.error('Data Gov Agent error:', error);
+    return c.json(
+      {
+        success: false,
+        error:
+          error instanceof Error ? error.message : 'Unknown error occurred',
+      },
+      500
+    );
+  }
 });
 
 // Mount v1 routes under /v1
