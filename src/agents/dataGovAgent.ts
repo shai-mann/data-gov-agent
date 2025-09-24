@@ -27,23 +27,23 @@ const tools = [
 
 const llmWithTools = openai.bindTools(tools);
 
-// Main LLM node that can access all dataset-finding tools
-async function datasetFindingNode(state: DataGovState) {
-  // Extract and confirm that a userQuery exists
-  let userQuery = state.userQuery;
+// Entry node - extracts user query once
+async function extractUserQueryNode(state: DataGovState) {
+  const messages = state.messages;
+  const lastMessage = messages.at(-1);
 
-  // If no existing userQuery, extract it from the last message
-  if (!userQuery) {
-    const messages = state.messages;
-    const lastMessage = messages.at(-1);
-
-    if (!lastMessage || !(lastMessage instanceof HumanMessage)) {
-      throw new Error('No user message found for dataset finding');
-    }
-
-    userQuery = lastMessage?.content as string;
+  if (!lastMessage || !(lastMessage instanceof HumanMessage)) {
+    throw new Error('No user message found for dataset finding');
   }
 
+  return {
+    ...state,
+    userQuery: lastMessage.content as string,
+  };
+}
+
+// Main LLM node that can access all dataset-finding tools
+async function datasetFindingNode(state: DataGovState) {
   const result = await llmWithTools.invoke([
     {
       role: 'system',
@@ -79,7 +79,6 @@ Be thorough in your evaluation and helpful in your explanations.`,
 
   return {
     ...state,
-    userQuery,
     messages: [result],
   };
 }
@@ -131,12 +130,14 @@ function shouldContinue(state: DataGovState) {
 
 // Build the data-gov agent workflow
 const dataGovAgent = new StateGraph(MessagesAnnotation)
+  .addNode('extractQuery', extractUserQueryNode)
   .addNode('llmNode', datasetFindingNode)
   .addNode('toolNode', toolNode)
   .addNode('finalResult', finalResultNode)
 
   // Add edges
-  .addEdge('__start__', 'llmNode')
+  .addEdge('__start__', 'extractQuery')
+  .addEdge('extractQuery', 'llmNode')
   .addConditionalEdges('llmNode', shouldContinue, [
     'toolNode',
     'finalResult',
