@@ -1,13 +1,7 @@
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph';
 import { HumanMessage, AIMessage, BaseMessage } from '@langchain/core/messages';
 import { ToolNode } from 'langchain';
-import {
-  packageSearch,
-  packageShow,
-  doiView,
-  datasetDownload,
-  datasetEvaluation,
-} from '../tools';
+import { packageSearch, packageShow, doiView, datasetDownload } from '../tools';
 import { openai } from '../llms';
 import { DatasetSelection, DatasetSelectionSchema } from '../lib/annotation';
 import { DATA_GOV_PROMPT, PARSE_DATASET_PROMPT } from '../lib/prompts';
@@ -23,13 +17,7 @@ const DataGovAnnotation = Annotation.Root({
 });
 
 // Set up tool calling
-const tools = [
-  packageSearch,
-  packageShow,
-  doiView,
-  datasetDownload,
-  datasetEvaluation,
-];
+const tools = [packageSearch, packageShow, doiView, datasetDownload];
 
 const llmWithTools = openai.bindTools(tools);
 
