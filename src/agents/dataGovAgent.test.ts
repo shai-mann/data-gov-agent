@@ -3,6 +3,7 @@ import { setupNock } from '../../test/nockSetup';
 import dataGovAgent from './dataGovAgent';
 import redactInvocationIds from '../../test/redactInvocationIds';
 import exportGraphPNG from './helpers/exportGraphPNG';
+import { HumanMessage } from 'langchain';
 
 describe('Data Gov Agent with Nock replay', () => {
   let nockHelper: ReturnType<typeof setupNock>;
@@ -18,10 +19,7 @@ describe('Data Gov Agent with Nock replay', () => {
   it('searches for climate change datasets', async () => {
     const result = await dataGovAgent.invoke({
       messages: [
-        {
-          role: 'user',
-          content: 'Find datasets about climate change',
-        },
+        new HumanMessage({ content: 'Find datasets about climate change' }),
       ],
     });
 
@@ -31,10 +29,7 @@ describe('Data Gov Agent with Nock replay', () => {
   it('searches for economic data', async () => {
     const result = await dataGovAgent.invoke({
       messages: [
-        {
-          role: 'user',
-          content: 'I need economic indicators data',
-        },
+        new HumanMessage({ content: 'I need economic indicators data' }),
       ],
     });
 
@@ -43,12 +38,7 @@ describe('Data Gov Agent with Nock replay', () => {
 
   it('handles empty search results', async () => {
     const result = await dataGovAgent.invoke({
-      messages: [
-        {
-          role: 'user',
-          content: 'xyz123nonexistentdata',
-        },
-      ],
+      messages: [new HumanMessage({ content: 'xyz123nonexistentdata' })],
     });
 
     expect(redactInvocationIds(result)).toMatchSnapshot();
