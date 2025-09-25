@@ -12,9 +12,9 @@ export const packageSearch = tool(
     );
 
     // Search for packages on data.gov, applying pagination post-fact (since the API doesn't support pagination)
-    const result = await searchPackages(query);
+    const { result } = await searchPackages(query);
 
-    const packages = result.result.results;
+    const packages = result.results;
 
     return {
       success: true,

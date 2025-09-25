@@ -1,6 +1,8 @@
 import {
   PackageSearchResponse,
   PackageSearchResponseSchema,
+  SinglePackageResponse,
+  SinglePackageResponseSchema,
 } from './data-gov.schemas';
 
 export const DATA_GOV_API_URL = 'https://catalog.data.gov/api/3';
@@ -22,4 +24,18 @@ export async function searchPackages(query: string) {
   const result = PackageSearchResponseSchema.parse(await response.json());
 
   return result satisfies PackageSearchResponse;
+}
+
+export async function getPackage(packageId: string) {
+  const response = await fetch(
+    `${DATA_GOV_API_URL}/action/package_show?id=${packageId}`,
+    {
+      method: 'GET',
+    }
+  );
+
+  // Validate the response
+  const result = SinglePackageResponseSchema.parse(await response.json());
+
+  return result satisfies SinglePackageResponse;
 }

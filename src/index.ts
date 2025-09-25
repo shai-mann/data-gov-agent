@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import dataGovAgent from './agents/dataGovAgent';
 import { HumanMessage } from '@langchain/core/messages';
-import { searchPackages } from './lib/data-gov';
+import { getPackage } from './lib/data-gov';
 
 const app = new Hono();
 
@@ -49,18 +49,12 @@ v1.post('/data-gov/search', async c => {
 });
 
 v1.get('/testing/tool', async c => {
-  const { q, limit, offset } = c.req.query();
+  const { id } = c.req.query();
 
-  const parsedLimit = parseInt(limit ?? '10');
-  const parsedOffset = parseInt(offset ?? '0');
-
-  const result = await searchPackages(q);
+  const result = await getPackage(id);
   return c.json({
     success: true,
-    result: result.result.results.slice(
-      parsedOffset,
-      parsedOffset + parsedLimit
-    ),
+    result: result.result,
   });
 });
 
