@@ -42,63 +42,43 @@ export const packageShow = tool(
   async ({ packageId }) => {
     console.log(`📦 Package Show - Package ID: ${packageId}`);
 
-    try {
-      const baseUrl = 'https://catalog.data.gov/api/3/action';
-      const showUrl = `${baseUrl}/package_show`;
-
-      const params = new URLSearchParams({
-        id: packageId,
-      });
-
-      console.log(`📡 Package Show - Fetching: ${showUrl}?${params}`);
-      const response = await fetch(`${showUrl}?${params}`);
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = (await response.json()) as any;
-
-      if (!data.success) {
-        throw new Error(`API error: ${data.error?.message || 'Unknown error'}`);
-      }
-
-      const packageData: PackageDetails = {
-        id: data.result.id,
-        title: data.result.title,
-        notes: data.result.notes || '',
-        tags: data.result.tags || [],
-        organization: data.result.organization || {
-          title: 'Unknown',
-          name: 'unknown',
-          description: '',
+    return {
+      id: '1',
+      title: 'Sample Title',
+      notes: 'Sample notes',
+      tags: [{ name: 'Sample Tag', display_name: 'Sample Tag' }],
+      organization: {
+        title: 'Unknown',
+        name: 'unknown',
+        description: '',
+      },
+      resources: [
+        {
+          id: '1',
+          name: 'Sample Resource',
+          description: 'Sample description',
+          format: 'CSV',
+          url: 'https://www.sample.com',
+          size: 100,
+          created: '2021-01-01',
+          last_modified: '2021-01-01',
         },
-        resources: data.result.resources || [],
-        extras: data.result.extras || [],
-        license_title: data.result.license_title || 'Unknown',
-        license_url: data.result.license_url || '',
-        author: data.result.author || 'Unknown',
-        author_email: data.result.author_email || '',
-        maintainer: data.result.maintainer || 'Unknown',
-        maintainer_email: data.result.maintainer_email || '',
-        created: data.result.created || '',
-        last_modified: data.result.last_modified || '',
-      };
-
-      console.log(`✅ Package Show - Retrieved: "${packageData.title}"`);
-      return {
-        success: true,
-        package: packageData,
-      };
-    } catch (error) {
-      console.log(`❌ Package Show - Error:`, error);
-      return {
-        success: false,
-        error:
-          error instanceof Error ? error.message : 'Unknown error occurred',
-        package: null,
-      };
-    }
+      ],
+      extras: [
+        {
+          key: 'Sample Key',
+          value: 'Sample Value',
+        },
+      ],
+      license_title: 'Sample License',
+      license_url: 'https://www.sample.com',
+      author: 'Sample Author',
+      author_email: 'sample@sample.com',
+      maintainer: 'Sample Maintainer',
+      maintainer_email: 'sample@sample.com',
+      created: '2021-01-01',
+      last_modified: '2021-01-01',
+    } satisfies PackageDetails;
   },
   {
     name: 'package_show',

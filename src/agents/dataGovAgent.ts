@@ -4,7 +4,8 @@ import {
   START,
   StateGraph,
 } from '@langchain/langgraph';
-import { HumanMessage } from '@langchain/core/messages';
+import { HumanMessage, AIMessage } from '@langchain/core/messages';
+import { ToolNode } from 'langchain';
 import {
   packageSearch,
   packageShow,
@@ -38,6 +39,7 @@ const tools = [
 ];
 
 const llmWithTools = openai.bindTools(tools);
+const toolNode = new ToolNode(tools);
 
 // Entry node - extracts user query once
 async function setupNode(state: DataGovState) {
@@ -55,7 +57,7 @@ async function setupNode(state: DataGovState) {
 }
 
 // Main LLM node that can access all dataset-finding tools
-async function datasetFindingNode(state: DataGovState) {
+async function llmNode(state: DataGovState) {
   const result = await llmWithTools.invoke([
     {
       role: 'system',
@@ -74,10 +76,19 @@ Your workflow:
 3. View DOI information if available using doiView
 4. Download and preview the dataset using datasetDownload
 5. Evaluate if it's suitable for the user's needs using datasetEvaluation
-6. If suitable, finalize your choice and end the process
+6. If suitable, respond with "DATASET_SELECTED:" followed by the dataset details in this exact format:
+   DATASET_SELECTED: {
+     "id": "dataset_id",
+     "title": "Dataset Title",
+     "reason": "Explanation of why this dataset is suitable",
+     "organization": "Organization Name",
+     "lastModified": "2024-01-01",
+     "resourceCount": 5,
+     "downloadUrl": "https://example.com/download"
+   }
 7. If not suitable, search for alternatives or explain why
 
-IMPORTANT: When you find a suitable dataset, provide some explanation of why it's suitable for the user's query.
+IMPORTANT: Only use the DATASET_SELECTED format when you are confident the dataset meets the user's needs.
 
 Be thorough in your evaluation and helpful in your explanations.`,
     },
@@ -85,21 +96,34 @@ Be thorough in your evaluation and helpful in your explanations.`,
   ]);
 
   return {
-    ...state,
     messages: [result],
   };
 }
 
-// Final result node - returns the selected dataset
+// Final result node - parses the selected dataset from the LLM response
 async function finalResultNode(state: DataGovState) {
   const messages = state.messages;
-  const selectedDataset = state.selectedDataset;
+  const lastMessage = messages.at(-1) as AIMessage;
 
   console.log('🎯 Final Result Node - Processing final result...');
 
+  // Parse the dataset selection from the LLM response
+  let selectedDataset = null;
+  if (lastMessage.content && typeof lastMessage.content === 'string') {
+    const content = lastMessage.content;
+    const datasetMatch = content.match(/DATASET_SELECTED:\s*({[\s\S]*?})/);
+    if (datasetMatch) {
+      try {
+        selectedDataset = JSON.parse(datasetMatch[1]);
+        console.log('🎯 Parsed selected dataset:', selectedDataset);
+      } catch (error) {
+        console.error('❌ Failed to parse dataset JSON:', error);
+      }
+    }
+  }
+
   if (!selectedDataset) {
     return {
-      ...state,
       messages: [
         ...messages,
         {
@@ -124,7 +148,6 @@ ${selectedDataset.reason}
 You can access this dataset and start using it for your analysis.`;
 
   return {
-    ...state,
     messages: [
       ...messages,
       {
@@ -132,30 +155,47 @@ You can access this dataset and start using it for your analysis.`;
         content: finalMessage,
       },
     ],
+    selectedDataset,
   };
 }
 
-// Simple conditional edge function
+// Conditional edge function to route to tools, final result, or continue LLM loop
 function shouldContinue(state: DataGovState) {
-  // If we have a selected dataset in state, move to final result
-  if (state.selectedDataset) {
-    return 'finalResult';
+  const messages = state.messages;
+  const lastMessage = messages.at(-1) as AIMessage;
+
+  // If the LLM makes a tool call, go to tool node
+  if (lastMessage.tool_calls && lastMessage.tool_calls.length > 0) {
+    return 'toolNode';
   }
 
-  // Otherwise, return to the LLM
+  // Check if the LLM has selected a dataset
+  if (lastMessage.content && typeof lastMessage.content === 'string') {
+    if (lastMessage.content.includes('DATASET_SELECTED:')) {
+      return 'finalResult';
+    }
+  }
+
+  // Otherwise, continue the LLM loop
   return 'llmNode';
 }
 
 // Build the data-gov agent workflow
 const dataGovAgent = new StateGraph(MessagesAnnotation)
   .addNode('setup', setupNode)
-  .addNode('llmNode', datasetFindingNode)
+  .addNode('llmNode', llmNode)
+  .addNode('toolNode', toolNode)
   .addNode('finalResult', finalResultNode)
 
   // Add edges
   .addEdge(START, 'setup')
   .addEdge('setup', 'llmNode')
-  .addConditionalEdges('llmNode', shouldContinue, ['finalResult', 'llmNode'])
+  .addConditionalEdges('llmNode', shouldContinue, [
+    'toolNode',
+    'llmNode',
+    'finalResult',
+  ])
+  .addEdge('toolNode', 'llmNode')
   .addEdge('finalResult', END)
 
   .compile();
