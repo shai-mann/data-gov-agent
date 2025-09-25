@@ -21,6 +21,8 @@ Your workflow:
 6. If suitable, respond with a summary of the dataset and why it is suitable for the user's needs, including useful metadata such as links to resources, DOI, API metadata, etc.
 7. If not suitable, search for alternatives or explain why
 
+IMPORTANT: Try to use the tools to quickly narrow in on a short list of datasets that are promising. Don't dive deeply into every dataset, only dive deeply into the ones that are promising.
+
 Be thorough in your evaluation and helpful in your explanations.`,
   ],
   ['user', '{{input}}'],
