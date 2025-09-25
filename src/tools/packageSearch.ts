@@ -24,58 +24,86 @@ export const packageSearch = tool(
       `🔍 Package Search - Query: "${query}", Limit: ${limit}, Offset: ${offset}`
     );
 
-    try {
-      const baseUrl = 'https://catalog.data.gov/api/3/action';
-      const searchUrl = `${baseUrl}/package_search`;
-
-      const params = new URLSearchParams({
-        q: query,
-        rows: limit.toString(),
-        start: offset.toString(),
-        sort: 'score desc, metadata_modified desc',
-      });
-
-      console.log(`📡 Package Search - Fetching: ${searchUrl}?${params}`);
-      const response = await fetch(`${searchUrl}?${params}`);
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = (await response.json()) as any;
-
-      if (!data.success) {
-        throw new Error(`API error: ${data.error?.message || 'Unknown error'}`);
-      }
-
-      const results: PackageSearchResult[] = data.result.results.map(
-        (pkg: any) => ({
-          id: pkg.id,
-          title: pkg.title,
-          notes: pkg.notes || '',
-          tags: pkg.tags || [],
-          organization: pkg.organization || { title: 'Unknown' },
-          resources: pkg.resources || [],
-        })
-      );
-
-      console.log(`✅ Package Search - Found ${results.length} results`);
-      return {
-        success: true,
-        count: data.result.count,
-        results: results,
-        query: query,
-      };
-    } catch (error) {
-      console.log(`❌ Package Search - Error:`, error);
-      return {
-        success: false,
-        error:
-          error instanceof Error ? error.message : 'Unknown error occurred',
-        results: [],
-        query: query,
-      };
-    }
+    return {
+      success: true,
+      results: [
+        {
+          id: '1',
+          title: 'Sample Dataset',
+          notes: 'Sample notes',
+          tags: [{ name: 'Sample Tag' }],
+          organization: { title: 'Sample Organization' },
+          resources: [
+            {
+              id: '1',
+              name: 'Sample Resource',
+              format: 'CSV',
+              url: 'https://www.sample.com',
+            },
+          ],
+        },
+        {
+          id: '2',
+          title: 'Sample Dataset 2',
+          notes: 'Sample notes 2',
+          tags: [{ name: 'Sample Tag 2' }],
+          organization: { title: 'Sample Organization 2' },
+          resources: [
+            {
+              id: '2',
+              name: 'Sample Resource 2',
+              format: 'CSV',
+              url: 'https://www.sample.com',
+            },
+          ],
+        },
+        {
+          id: '3',
+          title: 'Sample Dataset 3',
+          notes: 'Sample notes 3',
+          tags: [{ name: 'Sample Tag 3' }],
+          organization: { title: 'Sample Organization 3' },
+          resources: [
+            {
+              id: '3',
+              name: 'Sample Resource 3',
+              format: 'CSV',
+              url: 'https://www.sample.com',
+            },
+          ],
+        },
+        {
+          id: '4',
+          title: 'Sample Dataset 4',
+          notes: 'Sample notes 4',
+          tags: [{ name: 'Sample Tag 4' }],
+          organization: { title: 'Sample Organization 4' },
+          resources: [
+            {
+              id: '4',
+              name: 'Sample Resource 4',
+              format: 'CSV',
+              url: 'https://www.sample.com',
+            },
+          ],
+        },
+        {
+          id: '5',
+          title: 'Sample Dataset 5',
+          notes: 'Sample notes 5',
+          tags: [{ name: 'Sample Tag 5' }],
+          organization: { title: 'Sample Organization 5' },
+          resources: [
+            {
+              id: '5',
+              name: 'Sample Resource 5',
+              format: 'CSV',
+              url: 'https://www.sample.com',
+            },
+          ],
+        },
+      ] satisfies PackageSearchResult[],
+    };
   },
   {
     name: 'package_search',
