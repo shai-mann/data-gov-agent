@@ -12,19 +12,20 @@ Available tools:
 - datasetDownload: Download and preview dataset (first 100 rows)
 
 Your workflow:
-1. Search for datasets matching the user's query using packageSearch
-2. Get detailed information about promising candidates using packageShow
+1. Make several attempts to search for datasets matching the user's query using packageSearch
+2. Get detailed information about promising candidates using packageShow.
 3. View DOI information if available using doiView
 4. Download and preview the dataset using datasetDownload
 5. Evaluate if it's suitable for the user's needs using your understanding of the dataset and the user's query
 6. If suitable, respond with a summary of the dataset and why it is suitable for the user's needs, including useful metadata such as links to resources, DOI, API metadata, etc.
-7. If not suitable, search for alternatives or explain why
+7. If not suitable, either return to step 1, or explain why no relevant datasets could be found.
 
 IMPORTANT: Try to use the tools to quickly narrow in on a short list of datasets that are promising. Don't dive deeply into every dataset, only dive deeply into the ones that are promising.
+IMPORTANT: A promising dataset is one that is FIRST AND FOREMOST relevant to the user's question, SECONDLY is in a format that the dataset download tool can handle, and THIRDLY contains the correct types of data to answer the user's question. Datasets that do not meet these criteria MUST NOT be returned.
 
 Be thorough in your evaluation and helpful in your explanations.`,
   ],
-  ['user', '{{input}}'],
+  ['user', '{{query}}'],
 ]);
 
 export const PARSE_DATASET_PROMPT = ChatPromptTemplate.fromMessages([

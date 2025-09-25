@@ -1,7 +1,6 @@
 import { Hono } from 'hono';
 import dataGovAgent from './agents/dataGovAgent';
 import { HumanMessage } from '@langchain/core/messages';
-import { datasetDownload, doiView } from './tools';
 
 const app = new Hono();
 
@@ -46,25 +45,6 @@ v1.post('/data-gov/search', async c => {
       500
     );
   }
-});
-
-v1.get('/testing/tool', async c => {
-  const { resourceUrl, format, limit, offset } = c.req.query();
-
-  if (!['CSV'].find(f => f === format)) {
-    return c.json({ error: 'Invalid format' }, 400);
-  }
-
-  const result = await datasetDownload.func({
-    resourceUrl,
-    format: format as 'CSV',
-    limit: limit ? parseInt(limit) : 3,
-    offset: offset ? parseInt(offset) : 0,
-  });
-  return c.json({
-    success: true,
-    result: result,
-  });
 });
 
 // Mount v1 routes under /v1

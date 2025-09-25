@@ -45,9 +45,11 @@ async function setupNode(state: typeof DataGovAnnotation.State) {
 async function callModel(state: typeof DataGovAnnotation.State) {
   console.log('🔍 Calling model...', state.userQuery);
   const result = await llmWithTools.invoke([
-    ...(await DATA_GOV_PROMPT.formatMessages({ input: state.userQuery })),
+    ...(await DATA_GOV_PROMPT.formatMessages({ query: state.userQuery })),
     ...state.messages,
   ]);
+
+  console.log('🔍 Model result:', result);
 
   return {
     messages: [result],
