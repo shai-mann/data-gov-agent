@@ -31,7 +31,7 @@ v1.post('/data-gov/search', async c => {
 
     return c.json({
       success: true,
-      result: result,
+      result: result.messages.at(-1)?.content,
       query: query,
     });
   } catch (error) {

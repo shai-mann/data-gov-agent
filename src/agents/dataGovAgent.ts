@@ -6,6 +6,7 @@ import {
 } from '@langchain/langgraph';
 import { HumanMessage, AIMessage } from '@langchain/core/messages';
 import { ToolNode } from 'langchain';
+import { z } from 'zod';
 import {
   packageSearch,
   packageShow,
@@ -40,6 +41,27 @@ const tools = [
 
 const llmWithTools = openai.bindTools(tools);
 const toolNode = new ToolNode(tools);
+
+// Schema for structured dataset selection
+const DatasetSelectionSchema = z.object({
+  id: z.string().describe('The ID of the selected dataset'),
+  title: z.string().describe('The title of the selected dataset'),
+  reason: z
+    .string()
+    .describe(
+      "Explanation of why this dataset is suitable for the user's query"
+    ),
+  organization: z
+    .string()
+    .describe('The organization that published the dataset'),
+  lastModified: z.string().describe('When the dataset was last modified'),
+  resourceCount: z.number().describe('Number of resources in the dataset'),
+  downloadUrl: z.string().describe('URL to download the dataset'),
+});
+
+const llmWithStructuredOutput = openai.withStructuredOutput(
+  DatasetSelectionSchema
+);
 
 // Entry node - extracts user query once
 async function setupNode(state: DataGovState) {
@@ -76,19 +98,10 @@ Your workflow:
 3. View DOI information if available using doiView
 4. Download and preview the dataset using datasetDownload
 5. Evaluate if it's suitable for the user's needs using datasetEvaluation
-6. If suitable, respond with "DATASET_SELECTED:" followed by the dataset details in this exact format:
-   DATASET_SELECTED: {
-     "id": "dataset_id",
-     "title": "Dataset Title",
-     "reason": "Explanation of why this dataset is suitable",
-     "organization": "Organization Name",
-     "lastModified": "2024-01-01",
-     "resourceCount": 5,
-     "downloadUrl": "https://example.com/download"
-   }
+6. If suitable, respond with EXACTLY the text "READY_TO_SELECT_DATASET" and nothing else
 7. If not suitable, search for alternatives or explain why
 
-IMPORTANT: Only use the DATASET_SELECTED format when you are confident the dataset meets the user's needs.
+IMPORTANT: When you find a suitable dataset, respond with EXACTLY the text "READY_TO_SELECT_DATASET" and nothing else. This will trigger the dataset selection process.
 
 Be thorough in your evaluation and helpful in your explanations.`,
     },
@@ -100,27 +113,56 @@ Be thorough in your evaluation and helpful in your explanations.`,
   };
 }
 
-// Final result node - parses the selected dataset from the LLM response
+// Structured parsing node - extracts dataset info using structured output
+async function parseDatasetNode(state: DataGovState) {
+  console.log('📋 Parse Dataset Node - Extracting structured dataset info...');
+
+  const messages = state.messages;
+
+  // Create a summary of the conversation for the parsing LLM
+  const conversationSummary = messages
+    .slice(1) // Skip system message
+    .map(
+      msg =>
+        `${msg.type === 'human' ? 'User' : 'Assistant'}: ${typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)}`
+    )
+    .join('\n\n');
+
+  const result = await llmWithStructuredOutput.invoke([
+    {
+      role: 'system',
+      content: `You are a data extraction assistant. Based on the conversation below where a data.gov assistant found and evaluated datasets, extract the information about the FINAL selected dataset that the assistant determined was suitable for the user's query.
+
+Look through the conversation and identify:
+- Which dataset was ultimately selected as suitable
+- The dataset's metadata (ID, title, organization, etc.)
+- The reasoning for why it was selected
+- Any download or access information
+
+Extract this into the structured format requested.`,
+    },
+    {
+      role: 'user',
+      content: `Here is the conversation:\n\n${conversationSummary}\n\nPlease extract the information about the selected dataset.`,
+    },
+  ]);
+
+  console.log('📋 Parsed dataset:', result);
+
+  return {
+    selectedDataset: result,
+  };
+}
+
+// Final result node - formats the parsed dataset information
 async function finalResultNode(state: DataGovState) {
   const messages = state.messages;
-  const lastMessage = messages.at(-1) as AIMessage;
+  const selectedDataset = state.selectedDataset;
 
-  console.log('🎯 Final Result Node - Processing final result...');
-
-  // Parse the dataset selection from the LLM response
-  let selectedDataset = null;
-  if (lastMessage.content && typeof lastMessage.content === 'string') {
-    const content = lastMessage.content;
-    const datasetMatch = content.match(/DATASET_SELECTED:\s*({[\s\S]*?})/);
-    if (datasetMatch) {
-      try {
-        selectedDataset = JSON.parse(datasetMatch[1]);
-        console.log('🎯 Parsed selected dataset:', selectedDataset);
-      } catch (error) {
-        console.error('❌ Failed to parse dataset JSON:', error);
-      }
-    }
-  }
+  console.log(
+    '🎯 Final Result Node - Processing final result...',
+    selectedDataset
+  );
 
   if (!selectedDataset) {
     return {
@@ -155,11 +197,10 @@ You can access this dataset and start using it for your analysis.`;
         content: finalMessage,
       },
     ],
-    selectedDataset,
   };
 }
 
-// Conditional edge function to route to tools, final result, or continue LLM loop
+// Conditional edge function to route to tools, parsing, or continue LLM loop
 function shouldContinue(state: DataGovState) {
   const messages = state.messages;
   const lastMessage = messages.at(-1) as AIMessage;
@@ -169,10 +210,10 @@ function shouldContinue(state: DataGovState) {
     return 'toolNode';
   }
 
-  // Check if the LLM has selected a dataset
+  // Check if the LLM is ready to select a dataset
   if (lastMessage.content && typeof lastMessage.content === 'string') {
-    if (lastMessage.content.includes('DATASET_SELECTED:')) {
-      return 'finalResult';
+    if (lastMessage.content.trim() === 'READY_TO_SELECT_DATASET') {
+      return 'parseDataset';
     }
   }
 
@@ -185,6 +226,7 @@ const dataGovAgent = new StateGraph(MessagesAnnotation)
   .addNode('setup', setupNode)
   .addNode('llmNode', llmNode)
   .addNode('toolNode', toolNode)
+  .addNode('parseDataset', parseDatasetNode)
   .addNode('finalResult', finalResultNode)
 
   // Add edges
@@ -193,9 +235,10 @@ const dataGovAgent = new StateGraph(MessagesAnnotation)
   .addConditionalEdges('llmNode', shouldContinue, [
     'toolNode',
     'llmNode',
-    'finalResult',
+    'parseDataset',
   ])
   .addEdge('toolNode', 'llmNode')
+  .addEdge('parseDataset', 'finalResult')
   .addEdge('finalResult', END)
 
   .compile();
