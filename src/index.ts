@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import dataGovAgent from './agents/dataGovAgent';
+import { HumanMessage } from '@langchain/core/messages';
 
 const app = new Hono();
 
@@ -22,16 +23,15 @@ v1.post('/data-gov/search', async c => {
 
     const result = await dataGovAgent.invoke({
       messages: [
-        {
-          role: 'user',
+        new HumanMessage({
           content: query,
-        },
+        }),
       ],
     });
 
     return c.json({
       success: true,
-      result: result.messages.at(-1)?.content,
+      result: result.selectedDataset,
       query: query,
     });
   } catch (error) {
