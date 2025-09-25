@@ -1,56 +1,31 @@
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 
-interface DatasetPreview {
-  resource_id: string;
-  resource_name: string;
-  format: string;
-  url: string;
-  preview_data: any[];
-  total_rows: number;
-  columns: string[];
-  sample_size: number;
-}
-
 /**
  * Download and preview a dataset from data.gov (first 100 rows)
  */
 export const datasetDownload = tool(
-  async ({ resourceUrl, resourceId, format = 'auto' }) => {
-    console.log(
-      `📥 Dataset Download - Resource ID: ${resourceId}, URL: ${resourceUrl}, Format: ${format}`
-    );
+  async ({ resourceUrl, format = 'CSV', limit = 3, offset = 0 }) => {
+    console.log(`📥 Dataset Download - URL: ${resourceUrl}, Format: ${format}`);
 
     try {
-      // For now, we'll simulate dataset download and preview
-      // In a real implementation, you would:
-      // 1. Download the actual dataset file
-      // 2. Parse it based on format (CSV, JSON, XML, etc.)
-      // 3. Extract the first 100 rows
-      // 4. Return structured preview data
+      const response = await fetch(resourceUrl, {
+        headers: {
+          'Content-Type': 'text/csv',
+        },
+      });
 
-      // This is a stub implementation
-      const mockPreview: DatasetPreview = {
-        resource_id: resourceId,
-        resource_name: 'Sample Dataset',
-        format: format === 'auto' ? 'CSV' : format,
-        url: resourceUrl,
-        preview_data: [
-          { id: 1, name: 'Sample Row 1', value: 'Sample Value 1' },
-          { id: 2, name: 'Sample Row 2', value: 'Sample Value 2' },
-          { id: 3, name: 'Sample Row 3', value: 'Sample Value 3' },
-        ],
-        total_rows: 1000, // Mock total rows
-        columns: ['id', 'name', 'value'],
-        sample_size: 3,
-      };
+      const csv = await response.text();
+
+      // Give a tiny snippet of the CSV file
+      const preview = csv.split('\n').slice(offset, offset + limit);
 
       console.log(
-        `✅ Dataset Download - Preview generated with ${mockPreview.total_rows} total rows, ${mockPreview.sample_size} sample rows`
+        `✅ Dataset Download - Dataset downloaded with ${csv.length} total rows, returning rows ${offset} to ${offset + limit}`
       );
       return {
         success: true,
-        preview: mockPreview,
+        preview: preview,
       };
     } catch (error) {
       console.log(`❌ Dataset Download - Error:`, error);
@@ -70,13 +45,23 @@ export const datasetDownload = tool(
       resourceUrl: z
         .string()
         .describe('URL of the dataset resource to download'),
-      resourceId: z.string().describe('ID of the resource being downloaded'),
       format: z
-        .string()
+        .enum(['CSV'])
         .optional()
+        .default('CSV')
         .describe(
-          'Expected format of the dataset (CSV, JSON, XML, etc.). If auto, will attempt to detect format.'
+          'Expected format of the dataset (CSV, JSON, XML, etc.). Currently only supports CSV.'
         ),
+      limit: z
+        .number()
+        .optional()
+        .default(3)
+        .describe('Number of rows to return, between 1 and 10'),
+      offset: z
+        .number()
+        .optional()
+        .default(0)
+        .describe('Number of rows to skip'),
     }),
   }
 );
