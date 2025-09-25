@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import dataGovAgent from './agents/dataGovAgent';
 import { HumanMessage } from '@langchain/core/messages';
-import { getPackage } from './lib/data-gov';
+import { doiView } from './tools';
 
 const app = new Hono();
 
@@ -49,12 +49,12 @@ v1.post('/data-gov/search', async c => {
 });
 
 v1.get('/testing/tool', async c => {
-  const { id } = c.req.query();
+  const { doi } = c.req.query();
 
-  const result = await getPackage(id);
+  const result = await doiView.func({ doi });
   return c.json({
     success: true,
-    result: result.result,
+    result: result,
   });
 });
 

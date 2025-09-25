@@ -1,16 +1,6 @@
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
-
-interface DOIInfo {
-  doi: string;
-  title: string;
-  authors: string[];
-  publisher: string;
-  publication_date: string;
-  abstract: string;
-  url: string;
-  citation: string;
-}
+import * as cheerio from 'cheerio';
 
 /**
  * View DOI (Digital Object Identifier) information for a dataset
@@ -20,27 +10,23 @@ export const doiView = tool(
     console.log(`🔗 DOI View - DOI: ${doi}`);
 
     try {
-      // For now, we'll simulate DOI resolution
-      // In a real implementation, you would integrate with DOI resolution services
-      // like CrossRef, DataCite, or the DOI Foundation's API
+      // Fetch the DOI info using a basic fetch request in the HTML
+      // TODO: use Langchain's built in HTML parsing tool for this?
+      // TODO: add parsing node with separate model call for this tool?
 
-      // This is a stub implementation that would need to be replaced with actual DOI resolution
-      const mockDOIInfo: DOIInfo = {
-        doi: doi,
-        title: 'Dataset Title (DOI Resolution)',
-        authors: ['Unknown Author'],
-        publisher: 'Data.gov',
-        publication_date: new Date().toISOString().split('T')[0],
-        abstract:
-          'This dataset is available through data.gov and has been assigned a DOI for persistent identification.',
-        url: `https://doi.org/${doi}`,
-        citation: `Dataset Title (DOI Resolution). Data.gov. ${new Date().getFullYear()}. https://doi.org/${doi}`,
-      };
+      const response = await fetch(`https://doi.org/${doi}`, {
+        redirect: 'follow',
+      });
+
+      const html = await response.text();
+
+      const $ = cheerio.load(html);
+      const text = $('body').text().replace(/\s+/g, ' ').trim();
 
       console.log(`✅ DOI View - Retrieved info for: ${doi}`);
       return {
         success: true,
-        doi_info: mockDOIInfo,
+        doi_info: text.slice(2000, 7000), // safety: prevent token explosion
       };
     } catch (error) {
       console.log(`❌ DOI View - Error:`, error);
