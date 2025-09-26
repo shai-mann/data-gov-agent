@@ -80,10 +80,12 @@ You have access to the following tools:
    - Use this to confirm whether the dataset’s contents can be queried to yield a CONCRETE, FACTUAL answer to the user’s question.
    - The answer may be numeric (counts, averages, time series) or categorical (names, top-lists, rankings, classifications).
    - If the dataset clearly cannot provide such an answer, mark it as NOT RELEVANT immediately.
+   - IMPORTANT: When requesting data, never request more than 20 rows at a time. Do not re-request data you have already seen. For example, if you viewed rows 0–5, your next request should be rows 6–20, not 0–20.
 
 3. doiView
    - Retrieves information from a DOI link found in metadata.
    - Use this to clarify ambiguous column names, formats, or context about the dataset.
+   - Make sure you truly understand what the data represents. Numbers are meaningless without knowing what they measure. Use doiView or metadata to establish this meaning before making your determination.
 
 ---
 
