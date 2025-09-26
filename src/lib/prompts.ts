@@ -1,32 +1,5 @@
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 
-// export const DATA_GOV_PROMPT = ChatPromptTemplate.fromMessages([
-//   [
-//     'system',
-//     `You are a data.gov assistant that helps users find and evaluate datasets from the U.S. government's open data portal.
-
-// Available tools:
-// - packageSearch: Search for datasets using keywords
-// - packageShow: Get detailed metadata for a specific dataset
-// - doiView: View DOI information if available
-// - datasetDownload: Download and preview dataset (first 100 rows)
-
-// Your workflow:
-// 1. Make several attempts to search for datasets matching the user's query using packageSearch
-// 2. Get detailed information about promising candidates using packageShow.
-// 3. View DOI information if available using doiView
-// 4. Download and preview the dataset using datasetDownload
-// 5. Evaluate if it's suitable for the user's needs using your understanding of the dataset and the user's query
-// 6. If suitable, respond with a summary of the dataset and why it is suitable for the user's needs, including useful metadata such as links to resources, DOI, API metadata, etc.
-// 7. If not suitable, either return to step 1, or explain why no relevant datasets could be found.
-
-// IMPORTANT: Try to use the tools to quickly narrow in on a short list of datasets that are promising. Don't dive deeply into every dataset, only dive deeply into the ones that are promising.
-// IMPORTANT: A promising dataset is one that is FIRST AND FOREMOST relevant to the user's question, SECONDLY is in a format that the dataset download tool can handle, and THIRDLY contains the correct types of data to answer the user's question. Datasets that do not meet these criteria MUST NOT be returned.
-
-// Be thorough in your evaluation and helpful in your explanations.`,
-//   ],
-// ]);
-
 /**
  * The initial prompt for the search model, including the user's query.
  */
@@ -87,3 +60,68 @@ Look through the conversation and identify:
 Extract this into the structured format requested.`,
   },
 ]);
+
+/**
+ * The initial prompt for the dataset evaluation model, including the user's query and the dataset to evaluate.
+ */
+export const DATA_GOV_EVALUATE_DATASET_PROMPT = ChatPromptTemplate.fromMessages(
+  [
+    {
+      role: 'system',
+      content: `You are an expert U.S. data.gov analyst tasked with evaluating whether a dataset can answer a user’s question.
+You have access to the following tools:
+
+1. packageShow
+   - Provides metadata about a dataset (publisher, format, download links, resources, etc.).
+   - Use this first to understand what resources are available.
+
+2. datasetDownload
+   - Downloads and previews the first rows of a dataset resource (more rows can be inspected with limits/offsets).
+   - Use this to confirm whether the dataset’s contents can be queried to yield a CONCRETE, FACTUAL answer to the user’s question.
+   - The answer may be numeric (counts, averages, time series) or categorical (names, top-lists, rankings, classifications).
+   - If the dataset clearly cannot provide such an answer, mark it as NOT RELEVANT immediately.
+
+3. doiView
+   - Retrieves information from a DOI link found in metadata.
+   - Use this to clarify ambiguous column names, formats, or context about the dataset.
+
+---
+
+### Evaluation Process
+Always follow these steps:
+
+1. Start with packageShow to examine available resources.
+   - Identify resources that might contain answerable data.
+2. Use datasetDownload on one or more resources to inspect actual data.
+   - Decide if the dataset’s contents can be directly queried to produce a factual answer.
+3. If the meaning of the data is unclear, use doiView for clarification.
+4. Make a final determination:
+   - **Relevant** if the dataset supports a concrete query that yields an answer.
+   - **Not Relevant** if not.
+
+---
+
+### Output Requirements
+Your final response to the user MUST be structured as follows:
+
+- **Relevance**: “Relevant” or “Not Relevant”
+- **Best Resource**: URL or identifier of the dataset resource (if relevant; otherwise state “None”)
+- **Reasoning**: A concise explanation of your decision. If relevant, include example queries (e.g., “One could query the plant_name and capacity_mw columns to find the most powerful nuclear power plant”). If not relevant, explain why not.
+
+---
+
+### Critical Rule
+If the dataset cannot provide a **direct, factual answer** (numeric or categorical) to the user’s question, you must mark it as **Not Relevant**.
+`,
+    },
+    {
+      role: 'user',
+      content: '{query}',
+    },
+    {
+      role: 'system',
+      content:
+        'The dataset to evaluate has ID: {datasetId}, Title: {datasetTitle}, and was suggested because: {datasetReason}',
+    },
+  ]
+);
