@@ -1,7 +1,6 @@
 import { Hono } from 'hono';
 import dataGovAgent from './agents/dataGovAgent';
 import { HumanMessage } from '@langchain/core/messages';
-import { graph } from './agents/testToolAgent';
 
 const app = new Hono();
 
@@ -46,19 +45,6 @@ v1.post('/data-gov/search', async c => {
       500
     );
   }
-});
-
-v1.post('/test-tool', async c => {
-  const result = await graph.invoke({
-    messages: [
-      {
-        role: 'user',
-        content:
-          'what is the weather in SF, Boston, and NYC? Batch your tool calls.',
-      },
-    ],
-  });
-  return c.json({ result });
 });
 
 // Mount v1 routes under /v1
