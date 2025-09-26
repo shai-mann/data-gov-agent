@@ -10,6 +10,22 @@ export const PackageSearchResponseSchema = z.object({
 
 export type PackageSearchResponse = z.infer<typeof PackageSearchResponseSchema>;
 
+export const PackageAutocompleteResponseSchema = z.object({
+  success: z.boolean(),
+  result: z.array(
+    z.object({
+      name: z.string(),
+      title: z.string(),
+      match_field: z.string(),
+      match_displayed: z.string(),
+    })
+  ),
+});
+
+export type PackageAutocompleteResponse = z.infer<
+  typeof PackageAutocompleteResponseSchema
+>;
+
 export const SinglePackageResponseSchema = z.object({
   success: z.boolean(),
   result: z.any(),

@@ -1,4 +1,6 @@
 import {
+  PackageAutocompleteResponse,
+  PackageAutocompleteResponseSchema,
   PackageSearchResponse,
   PackageSearchResponseSchema,
   SinglePackageResponse,
@@ -24,6 +26,19 @@ export async function searchPackages(query: string) {
   const result = PackageSearchResponseSchema.parse(await response.json());
 
   return result satisfies PackageSearchResponse;
+}
+
+export async function packageAutocomplete(query: string) {
+  const response = await fetch(
+    `${DATA_GOV_API_URL}/action/package_autocomplete?q=${query}`,
+    {
+      method: 'GET',
+    }
+  );
+
+  const result = PackageAutocompleteResponseSchema.parse(await response.json());
+
+  return result satisfies PackageAutocompleteResponse;
 }
 
 export async function getPackage(packageId: string) {
