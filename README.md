@@ -67,21 +67,73 @@ bun run type-check
 
 ## API Endpoints
 
-- `GET /` - Welcome message and API info
-- `GET /health` - Health check endpoint
-- `GET /api/hello?name=World` - Hello world endpoint
+- `GET /v1/health` - Health check endpoint
+- `POST /v1/data-gov/search` - Data.gov agent search endpoint
+
+### Data.gov Agent
+
+The data.gov agent helps users find and evaluate datasets from the U.S. government's open data portal. It uses a single LLM node with access to all dataset-finding tools, allowing for flexible and intelligent dataset discovery.
+
+**Available Tools:**
+
+- **Package Search** - Searches for datasets using keywords
+- **Package Show** - Retrieves detailed metadata for specific datasets
+- **DOI View** - Shows DOI information if available
+- **Dataset Download** - Downloads and previews the first 100 rows
+- **Dataset Evaluation** - Evaluates if a dataset is suitable for the user's query
+
+**Workflow:**
+The LLM intelligently uses these tools to:
+
+1. Search for datasets matching the user's query
+2. Get detailed information about promising candidates
+3. View DOI information if available
+4. Download and preview datasets
+5. Evaluate suitability and provide recommendations
+6. Return the best match or search for alternatives
+
+#### Usage
+
+```bash
+curl -X POST http://localhost:3000/v1/data-gov/search \
+  -H "Content-Type: application/json" \
+  -d '{"query": "climate change data"}'
+```
 
 ## Project Structure
 
 ```
 ├── src/
-│   └── index.ts          # Main server file
-├── .eslintrc.json        # ESLint configuration
-├── .prettierrc           # Prettier configuration
-├── .prettierignore       # Prettier ignore patterns
-├── tsconfig.json         # TypeScript configuration
-├── package.json          # Dependencies and scripts
-└── README.md            # This file
+│   ├── agents/
+│   │   ├── calcAgent.ts          # Simple arithmetic calculator agent
+│   │   ├── dataGovAgent.ts       # Data.gov dataset search agent
+│   │   ├── calcAgent.test.ts     # Calculator agent tests
+│   │   ├── dataGovAgent.test.ts  # Data.gov agent tests
+│   │   └── helpers/
+│   │       └── exportGraphPNG.ts # Graph visualization helper
+│   ├── llms/
+│   │   ├── index.ts              # LLM exports
+│   │   └── openai.ts             # OpenAI configuration
+│   ├── tools/
+│   │   ├── add.ts                # Simple addition tool
+│   │   ├── packageSearch.ts      # Data.gov package search tool
+│   │   ├── packageShow.ts        # Data.gov package details tool
+│   │   ├── doiView.ts            # DOI information tool
+│   │   ├── datasetDownload.ts    # Dataset download and preview tool
+│   │   ├── datasetEvaluation.ts  # Dataset suitability evaluation tool
+│   │   └── index.ts              # Tool exports
+│   └── index.ts                  # Main server file
+├── test/
+│   ├── __fixtures__/             # Test fixtures and mocks
+│   ├── extendExpect.ts           # Test extensions
+│   ├── nockSetup.ts              # HTTP mocking setup
+│   └── redactInvocationIds.ts    # Test data redaction
+├── .github/workflows/
+│   └── ci.yml                    # GitHub Actions CI workflow
+├── tsconfig.json                 # TypeScript configuration
+├── vitest.config.ts              # Vitest test configuration
+├── package.json                  # Dependencies and scripts
+└── README.md                    # This file
 ```
 
 ## CI/CD
