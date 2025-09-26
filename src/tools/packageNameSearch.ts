@@ -12,11 +12,10 @@ export const packageNameSearch = tool(
     const { result } = await packageAutocomplete(query);
 
     console.log(
-      '🔍 Package Name Search - Result:',
-      result.slice(offset, offset + limit)
+      `🔍 Package Name Search - Found ${result.slice(offset, offset + limit).length} results`
     );
 
-    // Slice the result to the limit and offset
+    // Slice the result to the limit and offset and return
     return {
       success: true,
       results: result.slice(offset, offset + limit),

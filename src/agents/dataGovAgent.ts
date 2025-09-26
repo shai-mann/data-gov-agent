@@ -5,42 +5,33 @@ import {
   START,
   StateGraph,
 } from '@langchain/langgraph';
-import { HumanMessage } from '@langchain/core/messages';
-import { ToolNode } from '@langchain/langgraph/prebuilt';
 import {
-  packageSearch,
-  packageShow,
-  doiView,
-  datasetDownload,
-  packageNameSearch,
-} from '../tools';
+  HumanMessage,
+  isAIMessage,
+  isToolMessage,
+} from '@langchain/core/messages';
+import { ToolNode } from '@langchain/langgraph/prebuilt';
+import { packageSearch, packageNameSearch, selectDataset } from '../tools';
 import { openai } from '../llms';
-import { DatasetSelections, DatasetSelectionSchema } from '../lib/annotation';
 import {
   DATA_GOV_REMINDER_PROMPT,
   DATA_GOV_SEARCH_PROMPT,
-  PARSE_DATASET_PROMPT,
 } from '../lib/prompts';
+import { DatasetSelection } from '../lib/annotation';
 
 // Define the state annotation of this agent's graph
 const DataGovAnnotation = Annotation.Root({
   ...MessagesAnnotation.spec,
-  datasetSelections: Annotation<DatasetSelections['datasets']>({
+  datasetSelections: Annotation<DatasetSelection[]>({
     reducer: (cur, val) => cur.concat(val),
     default: () => [],
   }),
   userQuery: Annotation<string>(),
 });
 
-// Set up tool calling
-const searchTools = [packageSearch, packageNameSearch];
-const evaluateTools = [packageShow, doiView, datasetDownload];
+const searchTools = [packageSearch, packageNameSearch, selectDataset];
 
 const searchModel = openai.bindTools(searchTools);
-const evaluateModel = openai.bindTools(evaluateTools);
-
-// Create structured output LLM for parsing node
-const parserModel = openai.withStructuredOutput(DatasetSelectionSchema);
 
 // Entry node - extracts user query before calling the model
 async function setupNode(state: typeof DataGovAnnotation.State) {
@@ -63,7 +54,11 @@ async function setupNode(state: typeof DataGovAnnotation.State) {
 
 // An LLM node with access to tools to search for datasets by query (including or excluding metadata)
 async function searchModelNode(state: typeof DataGovAnnotation.State) {
-  console.log('🔍 Calling model...');
+  console.log(
+    '🔍 Calling model... currently has',
+    state.datasetSelections.length,
+    'dataset selections'
+  );
 
   const reminderPrompt = await DATA_GOV_REMINDER_PROMPT.formatMessages({
     query: state.userQuery,
@@ -80,19 +75,39 @@ async function searchModelNode(state: typeof DataGovAnnotation.State) {
   };
 }
 
-// Structured parsing node - extracts dataset info using structured output
-async function parseDatasetNode(state: typeof DataGovAnnotation.State) {
-  console.log('📋 Parse Dataset Node - Extracting structured dataset info...');
+// Middle node to process dataset evaluation results
+async function processDatasetSelectionNode(
+  state: typeof DataGovAnnotation.State
+) {
+  console.log('⚖️ Tool post-processing Node - Processing tool results...');
+  const { messages } = state;
 
-  const result = await parserModel.invoke([
-    ...(await PARSE_DATASET_PROMPT.formatMessages({})),
-    ...state.messages,
-  ]);
+  // Since it could be a batch of tool calls, we need to find all tool calls since the last AI message
+  const lastAiMessageIndex =
+    messages
+      // find index of last AIMessage
+      .map((m, i) => [m, i] as const)
+      .filter(([m]) => isAIMessage(m))
+      .map(([, i]) => i)
+      .pop() ?? -1;
 
-  console.log('🔍 Parse Dataset Node - Result:', result);
+  const toolMessages = messages
+    .slice(lastAiMessageIndex + 1)
+    .filter(m => isToolMessage(m))
+    .filter(m => m.name === 'selectDataset')
+    .filter(m => m.content && typeof m.content === 'string')
+    .map(m => JSON.parse(m.content as string));
 
+  if (toolMessages.length === 0) {
+    console.log('🔍 No selectDataset tool calls found');
+    return {};
+  }
+
+  console.log(`🔍 Adding ${toolMessages.length} new selections`);
+
+  // Add new selections to the state
   return {
-    datasetSelections: result.datasets satisfies DatasetSelections['datasets'],
+    datasetSelections: [...state.datasetSelections, ...toolMessages],
   };
 }
 
@@ -111,7 +126,8 @@ function shouldContinue(state: typeof DataGovAnnotation.State) {
   }
 
   // If no tools were called, the AI is presumed to have found all the datasets it needed to find
-  return 'parseDataset';
+  console.log('🔍 Exiting workflow');
+  return END;
 }
 
 // Build the data-gov agent workflow
@@ -119,16 +135,13 @@ const dataGovAgent = new StateGraph(DataGovAnnotation)
   .addNode('setup', setupNode)
   .addNode('searchNode', searchModelNode)
   .addNode('searchTools', new ToolNode(searchTools))
-  .addNode('parseDataset', parseDatasetNode)
+  .addNode('processDatasetSelection', processDatasetSelectionNode)
 
   .addEdge(START, 'setup')
   .addEdge('setup', 'searchNode')
-  .addEdge('searchTools', 'searchNode')
-  .addConditionalEdges('searchNode', shouldContinue, [
-    'searchTools',
-    'parseDataset',
-  ])
-  .addEdge('parseDataset', END)
+  .addEdge('searchTools', 'processDatasetSelection')
+  .addEdge('processDatasetSelection', 'searchNode')
+  .addConditionalEdges('searchNode', shouldContinue, ['searchTools', END])
 
   .compile();
 
