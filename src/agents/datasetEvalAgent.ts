@@ -11,6 +11,10 @@ import { openai } from '../llms';
 import { datasetDownload, doiView, packageShow } from '../tools';
 import { ToolNode } from '@langchain/langgraph/prebuilt';
 import { AIMessage } from '@langchain/core/messages';
+import { WebBrowser } from 'langchain/tools/webbrowser';
+import { OpenAIEmbeddings } from '@langchain/openai';
+import { tool } from 'langchain';
+import { z } from 'zod';
 
 // State annotation for the dataset evaluation workflow
 const DatasetEvalAnnotation = Annotation.Root({
@@ -23,13 +27,15 @@ const DatasetEvalAnnotation = Annotation.Root({
 const tools = [packageShow, datasetDownload, doiView];
 
 const model = openai.bindTools(tools);
+const embeddings = new OpenAIEmbeddings();
+const webBrowser = new WebBrowser({ model: openai, embeddings });
 
 /* DATASET EVALUATION WORKFLOW */
 
 async function setupNode(state: typeof DatasetEvalAnnotation.State) {
   const { dataset, userQuery } = state;
 
-  console.log('🔍 Dataset to evaluate:', dataset, 'User query:', userQuery);
+  console.log('🔍 Setting up initial state...');
 
   const prompt = await DATA_GOV_EVALUATE_DATASET_PROMPT.formatMessages({
     query: userQuery,
@@ -45,11 +51,7 @@ async function setupNode(state: typeof DatasetEvalAnnotation.State) {
 
 // Core evaluation prompt (evaluates a single dataset in the context of the user query)
 async function modelNode(state: typeof DatasetEvalAnnotation.State) {
-  console.log(
-    '🔍 Calling model... currently has',
-    state.messages.length,
-    'messages'
-  );
+  console.log('🔍 Calling model...');
 
   const result = await model.invoke([...state.messages]);
 
@@ -74,10 +76,26 @@ function shouldContinue(state: typeof DatasetEvalAnnotation.State) {
   return END;
 }
 
+// TODO: temporary tool to have logging for when searching the web
+const webSearchTool = tool(
+  async ({ query }) => {
+    console.log('🔍 Searching the web for:', query);
+    const result = await webBrowser.invoke({ query });
+    return result;
+  },
+  {
+    name: 'webSearch',
+    description: 'Search the web for information about the dataset',
+    schema: z.object({
+      query: z.string().describe('The query to search the web for'),
+    }),
+  }
+);
+
 const graph = new StateGraph(DatasetEvalAnnotation)
   .addNode('setup', setupNode)
   .addNode('model', modelNode)
-  .addNode('toolNode', new ToolNode(tools))
+  .addNode('toolNode', new ToolNode([...tools, webSearchTool]))
 
   .addEdge(START, 'setup')
   .addEdge('setup', 'model')
