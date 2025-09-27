@@ -19,7 +19,7 @@ import {
 } from '../lib/prompts';
 import { DatasetSelection } from '../lib/annotation';
 
-// Define the state annotation of this agent's graph
+// State annotation for the dataset selection workflow
 const DataGovAnnotation = Annotation.Root({
   ...MessagesAnnotation.spec,
   datasetSelections: Annotation<DatasetSelection[]>({
@@ -32,6 +32,8 @@ const DataGovAnnotation = Annotation.Root({
 const searchTools = [packageSearch, packageNameSearch, selectDataset];
 
 const searchModel = openai.bindTools(searchTools);
+
+/* DATASET SELECTION WORKFLOW */
 
 // Entry node - extracts user query before calling the model
 async function setupNode(state: typeof DataGovAnnotation.State) {
@@ -107,6 +109,7 @@ async function processDatasetSelectionNode(
 
   // Add new selections to the state
   return {
+    // TODO: can I just return the toolMessages, since I have a reducer to concat?
     datasetSelections: [...state.datasetSelections, ...toolMessages],
   };
 }
