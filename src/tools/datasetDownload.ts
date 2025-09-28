@@ -42,7 +42,7 @@ export const datasetDownload = tool(
     try {
       // 1 minute timeout - if the download takes too long, abort it.
       const controller = new AbortController();
-      setTimeout(() => controller.abort(), ONE_SECOND);
+      setTimeout(() => controller.abort(), ONE_MINUTE);
 
       const response = await fetch(resourceUrl, {
         headers: {
