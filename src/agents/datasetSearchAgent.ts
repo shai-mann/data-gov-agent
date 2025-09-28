@@ -132,6 +132,7 @@ function shouldContinueFromPostTools(
 ) {
   const { datasets } = state;
   if (datasets.length >= MAX_REQUESTED_DATASETS) {
+    console.log('🔍 Exiting search workflow - reached max requested datasets');
     return END;
   }
   return 'model';

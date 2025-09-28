@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import dataGovAgent from './agents/dataGovAgent';
+import datasetSearchAgent from './agents/datasetSearchAgent';
 
 const app = new Hono();
 
@@ -40,6 +41,19 @@ v1.post('/data-gov/search', async c => {
       500
     );
   }
+});
+
+v1.post('/data-gov/test', async c => {
+  // call the dataset search agent
+  const result = await datasetSearchAgent.invoke({
+    userQuery:
+      'What percentage of crimes are committed by people over 80 years old?',
+  });
+
+  return c.json({
+    success: true,
+    result: result.datasets,
+  });
 });
 
 // Mount v1 routes under /v1

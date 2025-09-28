@@ -6,7 +6,7 @@ import {
   StateGraph,
 } from '@langchain/langgraph';
 import { DatasetWithEvaluation } from '../lib/annotation';
-import { ToolNode } from 'langchain';
+import { ToolNode } from '@langchain/langgraph/prebuilt';
 import { openai } from '../llms';
 import { evalAgent, searchAgent } from './agentic-tools';
 import { DATA_GOV_CORE_PROMPT } from '../lib/prompts';
@@ -29,7 +29,9 @@ async function setupNode(state: typeof DataGovAnnotation.State) {
 
   console.log('🔍 Initializing data-gov agent');
 
-  const prompt = await DATA_GOV_CORE_PROMPT.formatMessages({});
+  const prompt = await DATA_GOV_CORE_PROMPT.formatMessages({
+    query: userQuery,
+  });
 
   return {
     messages: prompt,
@@ -51,8 +53,6 @@ function shouldContinue(state: typeof DataGovAnnotation.State) {
   const { messages } = state;
   const lastMessage = messages[messages.length - 1];
 
-  console.log('🔍 Last message:', lastMessage);
-
   // If the LLM makes a tool call, go to tool node
   if (
     'tool_calls' in lastMessage &&
@@ -72,6 +72,7 @@ const graph = new StateGraph(DataGovAnnotation)
   .addNode('setup', setupNode)
   .addNode('model', modelNode)
   // TODO: add post-tools node to update the datasets with evaluations.
+  // TODO: custom tool node to intercept and use the correct user query, so the agent can't change it when passing it in????
   .addNode('tools', new ToolNode(tools))
 
   .addEdge(START, 'setup')

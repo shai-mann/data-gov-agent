@@ -23,7 +23,9 @@ export const searchAgent = tool(
     name: 'searchAgent',
     description: "Search for 10-15 datasets matching the user's query",
     schema: z.object({
-      userQuery: z.string(),
+      userQuery: z
+        .string()
+        .describe("The user's PRECISE and EXACT query to search for datasets"),
     }),
   }
 );

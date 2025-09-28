@@ -21,11 +21,13 @@ export const evalAgent = tool(
     name: 'evalAgent',
     description: "Evaluate a single dataset in the context of the user's query",
     schema: z.object({
-      userQuery: z.string(),
+      userQuery: z
+        .string()
+        .describe("The user's PRECISE and EXACT query to search for datasets"),
       dataset: z.object({
-        id: z.string(),
-        title: z.string(),
-        reason: z.string(),
+        id: z.string().describe('The ID of the dataset to evaluate'),
+        title: z.string().describe('The title of the dataset to evaluate'),
+        reason: z.string().describe('The reason for evaluating the dataset'),
       }),
     }),
   }

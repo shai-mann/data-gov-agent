@@ -36,10 +36,14 @@ export const datasetDownload = tool(
     }
 
     try {
+      // 10 second timeout - if the download takes too long, abort it.
+      const signal = AbortSignal.timeout(10000);
+
       const response = await fetch(resourceUrl, {
         headers: {
           'Content-Type': 'text/csv',
         },
+        signal,
       });
 
       const csv = await response.text();

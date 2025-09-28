@@ -25,7 +25,14 @@ export const DATA_GOV_CORE_PROMPT = ChatPromptTemplate.fromMessages([
     - A dataset must match the SCOPE of a user's question. If they are asking about the full U.S., a dataset covering New York State is not sufficient.
     - If you find a dataset that can answer the user's question FULLY and COMPLETELY, return the dataset.
     - ALWAYS EVALUATE ALL DATASETS using the evalAgent. Do not skip any.
+
+    CRITICAL:
+    - Do NOT modify the user's query in any way. Modifying the query may result in the wrong question being answered, which is unacceptable.
 `,
+  },
+  {
+    role: 'user',
+    content: '{query}',
   },
 ]);
 
