@@ -1,7 +1,5 @@
 export type DatasetSelection = { id: string; title: string; reason: string };
 
-export type DatasetEvaluation = {
-  dataset: DatasetSelection;
-  evaluation: string;
-  score: number;
+export type DatasetWithEvaluation = DatasetSelection & {
+  evaluation?: string; // Optional because it may not have been evaluated yet
 };

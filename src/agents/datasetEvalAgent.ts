@@ -6,7 +6,7 @@ import {
   StateGraph,
 } from '@langchain/langgraph';
 import { DATA_GOV_EVALUATE_DATASET_PROMPT } from '../lib/prompts';
-import { DatasetEvaluation, DatasetSelection } from '../lib/annotation';
+import { DatasetSelection } from '../lib/annotation';
 import { openai } from '../llms';
 import { datasetDownload, doiView, packageShow } from '../tools';
 import { ToolNode } from '@langchain/langgraph/prebuilt';
@@ -21,7 +21,6 @@ const DatasetEvalAnnotation = Annotation.Root({
   ...MessagesAnnotation.spec,
   dataset: Annotation<DatasetSelection>,
   userQuery: Annotation<string>,
-  evaluation: Annotation<DatasetEvaluation>,
 });
 
 const tools = [packageShow, datasetDownload, doiView];

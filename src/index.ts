@@ -1,6 +1,5 @@
 import { Hono } from 'hono';
 import dataGovAgent from './agents/dataGovAgent';
-import datasetEvalAgent from './agents/datasetEvalAgent';
 
 const app = new Hono();
 
@@ -29,32 +28,6 @@ v1.post('/data-gov/search', async c => {
       success: true,
       result: result.datasets,
       query: query,
-    });
-  } catch (error) {
-    console.error('Data Gov Agent error:', error);
-    return c.json(
-      {
-        success: false,
-        error:
-          error instanceof Error ? error.message : 'Unknown error occurred',
-      },
-      500
-    );
-  }
-});
-
-v1.post('/data-gov/eval', async c => {
-  try {
-    const { query, dataset } = await c.req.json();
-
-    const result = await datasetEvalAgent.invoke({
-      dataset,
-      userQuery: query,
-    });
-
-    return c.json({
-      success: true,
-      result: result.messages.at(-1),
     });
   } catch (error) {
     console.error('Data Gov Agent error:', error);

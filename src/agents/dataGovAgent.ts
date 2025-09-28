@@ -5,44 +5,79 @@ import {
   START,
   StateGraph,
 } from '@langchain/langgraph';
-import { DatasetSelection } from '../lib/annotation';
-import datasetSearchAgent from './datasetSearchAgent';
+import { DatasetWithEvaluation } from '../lib/annotation';
+import { ToolNode } from 'langchain';
+import { openai } from '../llms';
+import { evalAgent, searchAgent } from './agentic-tools';
+import { DATA_GOV_CORE_PROMPT } from '../lib/prompts';
 
-// State annotation for the dataset selection workflow
 const DataGovAnnotation = Annotation.Root({
   ...MessagesAnnotation.spec,
-  datasets: Annotation<DatasetSelection[]>({
-    reducer: (cur, val) => cur.concat(val),
+  datasets: Annotation<DatasetWithEvaluation[]>({
+    // NOT CONCATENATION, because we need to be able to override old datasets when the search returns new ones.
+    reducer: (_, val) => val,
     default: () => [],
   }),
   userQuery: Annotation<string>(),
 });
 
-async function searchAgentNode(state: typeof DataGovAnnotation.State) {
+const tools = [searchAgent, evalAgent];
+const llmWithTools = openai.bindTools(tools);
+
+async function setupNode(state: typeof DataGovAnnotation.State) {
   const { userQuery } = state;
 
-  console.log('🔍 Executing dataset searching agent with query:', userQuery);
+  console.log('🔍 Initializing data-gov agent');
 
-  const result = await datasetSearchAgent.invoke(
-    {
-      userQuery,
-    },
-    {
-      recursionLimit: 30, // slightly above the default of 20, but enough to find all datasets.
-    }
-  );
+  const prompt = await DATA_GOV_CORE_PROMPT.formatMessages({});
 
   return {
-    datasets: result.datasets,
+    messages: prompt,
+    userQuery,
   };
+}
+
+async function modelNode(state: typeof DataGovAnnotation.State) {
+  console.log('🔍 Invoking core agent');
+
+  const result = await llmWithTools.invoke(state.messages);
+
+  return {
+    messages: result,
+  };
+}
+
+function shouldContinue(state: typeof DataGovAnnotation.State) {
+  const { messages } = state;
+  const lastMessage = messages[messages.length - 1];
+
+  console.log('🔍 Last message:', lastMessage);
+
+  // If the LLM makes a tool call, go to tool node
+  if (
+    'tool_calls' in lastMessage &&
+    Array.isArray(lastMessage.tool_calls) &&
+    lastMessage.tool_calls?.length
+  ) {
+    return 'tools';
+  }
+
+  // If no tools were called, the AI is presumed to have found all the datasets it needed to find
+  console.log('🔍 Exiting search workflow');
+  return END;
 }
 
 // Build the data-gov agent workflow
 const graph = new StateGraph(DataGovAnnotation)
-  .addNode('searchAgent', searchAgentNode)
+  .addNode('setup', setupNode)
+  .addNode('model', modelNode)
+  // TODO: add post-tools node to update the datasets with evaluations.
+  .addNode('tools', new ToolNode(tools))
 
-  .addEdge(START, 'searchAgent')
-  .addEdge('searchAgent', END)
+  .addEdge(START, 'setup')
+  .addEdge('setup', 'model')
+  .addConditionalEdges('model', shouldContinue, ['tools', END])
+  .addEdge('tools', 'model')
 
   .compile();
 
