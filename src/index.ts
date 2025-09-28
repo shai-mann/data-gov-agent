@@ -1,6 +1,5 @@
 import { Hono } from 'hono';
 import dataGovAgent from './agents/dataGovAgent';
-import { HumanMessage } from '@langchain/core/messages';
 import datasetEvalAgent from './agents/datasetEvalAgent';
 
 const app = new Hono();
@@ -23,16 +22,12 @@ v1.post('/data-gov/search', async c => {
     }
 
     const result = await dataGovAgent.invoke({
-      messages: [
-        new HumanMessage({
-          content: query,
-        }),
-      ],
+      userQuery: query,
     });
 
     return c.json({
       success: true,
-      result: result.datasetSelections,
+      result: result.datasets,
       query: query,
     });
   } catch (error) {
