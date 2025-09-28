@@ -5,17 +5,15 @@ import {
   START,
   StateGraph,
 } from '@langchain/langgraph';
-import { DatasetWithEvaluation } from '../lib/annotation';
-import { ToolNode } from '@langchain/langgraph/prebuilt';
-import { openai } from '../llms';
-import { evalAgent, searchAgent } from './agentic-tools';
-import { DATA_GOV_CORE_PROMPT } from '../lib/prompts';
-import { isAIMessage, isToolMessage } from '@langchain/core/messages';
-import {
-  handleEvalToolMessages,
-  handleSelectDatasetToolMessages,
-} from './helpers/gov-agent.helpers';
+import { DatasetSelection, DatasetWithEvaluation } from '../lib/annotation';
+import { Send } from '@langchain/langgraph';
+import searchAgent from './datasetSearchAgent';
+import evalAgent from './datasetEvalAgent';
+import { MOCK_DATASETS } from './helpers/mock-datasets';
 
+/**
+ * Main annotation for the data-gov agent.
+ */
 const DataGovAnnotation = Annotation.Root({
   ...MessagesAnnotation.spec,
   datasets: Annotation<DatasetWithEvaluation[]>({
@@ -23,105 +21,76 @@ const DataGovAnnotation = Annotation.Root({
     reducer: (_, val) => val,
     default: () => [],
   }),
+  evaluatedDatasets: Annotation<DatasetWithEvaluation[]>({
+    // YES CONCATENATION, because we need to accumulate the evaluated datasets from fan-in and fan-out.
+    reducer: (cur, val) => cur.concat(val),
+    default: () => [],
+  }),
   userQuery: Annotation<string>(),
 });
 
-const tools = [searchAgent, evalAgent];
-const llmWithTools = openai.bindTools(tools);
+/**
+ * Simple annotation for a single dataset. Used in fan-out for evaluating datasets.
+ */
+const EvalDatasetAnnotation = Annotation.Root({
+  dataset: Annotation<DatasetSelection>(),
+  userQuery: Annotation<string>(),
+});
 
-async function setupNode(state: typeof DataGovAnnotation.State) {
+async function searchNode(state: typeof DataGovAnnotation.State) {
   const { userQuery } = state;
 
-  console.log('🔍 [CORE] Initializing');
+  // const { datasets } = await searchAgent.invoke(
+  //   {
+  //     userQuery,
+  //   },
+  //   {
+  //     // slightly above the default of 20, to allow more iteration as it finds datasets.
+  //     recursionLimit: 30,
+  //   }
+  // );
 
-  const prompt = await DATA_GOV_CORE_PROMPT.formatMessages({
-    query: userQuery,
+  const datasets = MOCK_DATASETS;
+
+  return {
+    userQuery,
+    datasets,
+  };
+}
+
+/**
+ * Conditional edge function to construct the fan-out for evaluating datasets.
+ */
+function continueToEval(state: typeof DataGovAnnotation.State) {
+  const { datasets, userQuery } = state;
+
+  return datasets.map(dataset => new Send('eval', { dataset, userQuery }));
+}
+
+async function evalNode(state: typeof EvalDatasetAnnotation.State) {
+  const { dataset, userQuery } = state;
+
+  const { dataset: evaluatedDataset } = await evalAgent.invoke({
+    dataset,
+    userQuery,
   });
 
-  return {
-    messages: prompt,
-    userQuery,
-  };
-}
-
-async function modelNode(state: typeof DataGovAnnotation.State) {
-  console.log('🔍 [CORE] Invoking model');
-
-  const result = await llmWithTools.invoke(state.messages);
+  console.log('🔍 [MOCK] Returning mock evaluated dataset', evaluatedDataset);
 
   return {
-    messages: result,
+    // Uses state key for outer state, so it will automatically go there.
+    evaluatedDatasets: evaluatedDataset,
   };
-}
-
-async function postToolsNode(state: typeof DataGovAnnotation.State) {
-  console.log('🔍 [CORE] Updating datasets with evaluations');
-
-  const { messages, datasets } = state;
-
-  // Since it could be a batch of tool calls, we need to find all tool calls since the last AI message
-  const lastAiMessageIndex =
-    messages
-      // find index of last AIMessage
-      .map((m, i) => [m, i] as const)
-      .filter(([m]) => isAIMessage(m))
-      .map(([, i]) => i)
-      .pop() ?? -1;
-
-  const toolMessages = messages
-    .slice(lastAiMessageIndex + 1)
-    .filter(m => isToolMessage(m))
-    .filter(m => m.name === 'evalAgent' || m.name === 'searchAgent')
-    .filter(m => m.content && typeof m.content === 'string');
-
-  // There should never be tool calls to both at once, so we can presume only searching if searching was called.
-  if (toolMessages.filter(m => m.name === 'searchAgent').length > 0) {
-    return {
-      datasets: handleSelectDatasetToolMessages(
-        toolMessages.filter(m => m.name === 'searchAgent')
-      ),
-    };
-  }
-
-  return {
-    datasets: handleEvalToolMessages(
-      toolMessages.filter(m => m.name === 'evalAgent'),
-      datasets
-    ),
-  };
-}
-
-function shouldContinue(state: typeof DataGovAnnotation.State) {
-  const { messages } = state;
-  const lastMessage = messages[messages.length - 1];
-
-  // If the LLM makes a tool call, go to tool node
-  if (
-    'tool_calls' in lastMessage &&
-    Array.isArray(lastMessage.tool_calls) &&
-    lastMessage.tool_calls?.length
-  ) {
-    return 'tools';
-  }
-
-  // If no tools were called, the AI is presumed to have found all the datasets it needed to find
-  console.log('🔍 [CORE] Exiting workflow');
-  return END;
 }
 
 // Build the data-gov agent workflow
 const graph = new StateGraph(DataGovAnnotation)
-  .addNode('setup', setupNode)
-  .addNode('model', modelNode)
-  // TODO: custom tool node to intercept and use the correct user query, so the agent can't change it when passing it in????
-  .addNode('tools', new ToolNode(tools))
-  .addNode('postTools', postToolsNode)
+  .addNode('search', searchNode)
+  .addNode('eval', evalNode)
 
-  .addEdge(START, 'setup')
-  .addEdge('setup', 'model')
-  .addConditionalEdges('model', shouldContinue, ['tools', END])
-  .addEdge('tools', 'postTools')
-  .addEdge('postTools', 'model')
+  .addEdge(START, 'search')
+  .addConditionalEdges('search', continueToEval)
+  .addEdge('eval', END)
 
   .compile();
 
