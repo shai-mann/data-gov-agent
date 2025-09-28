@@ -54,8 +54,8 @@ Your task is to provide a list of the **most relevant datasets** using only the 
 
 Follow this workflow carefully:
 
-1. **Start with packageNameSearch** to identify promising dataset names or related keywords. Repeat this step until you have a solid list of keywords.
-2. **Use packageSearch** with refined keywords to retrieve datasets.
+1. **Start with a batch of varied packageNameSearch calls** to identify promising dataset names or related keywords. Repeat this step until you have a solid list of keywords.
+2. **Use a batch ofpackageSearch calls** with refined keywords to retrieve datasets.
 3. **As soon as you find a dataset that looks promising**, immediately call **selectDataset** with its ID, title, and your reason for selecting it. Do this each time you encounter a good candidate, not just at the end.
 4. **Verify format compatibility**: only select datasets that clearly provide CSV resources. Do NOT select datasets in unsupported formats.
 5. **Iterate** as needed: adjust keywords, limits, or offsets, and continue searching until you have selected about 10 strong candidates.
@@ -78,7 +78,13 @@ Important:
 export const DATA_GOV_REMINDER_PROMPT = ChatPromptTemplate.fromMessages([
   {
     role: 'system',
-    content: `REMINDER: The user's query is: "{query}". Find 5-10 datasets that are relevant to the user's question. You currently have {datasetCount} datasets selected.`,
+    content: `REMINDER: The user's query is: "{query}". Find 5-10 datasets that are relevant to the user's question. You currently have {datasetCount} datasets selected.
+
+    The datasets you have selected so far are: {datasetIds}.
+
+    CRITICAL:
+    - Do not attempt to select a dataset you have already selected.
+    `,
   },
 ]);
 
