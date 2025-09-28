@@ -75,8 +75,6 @@ async function evalNode(state: typeof EvalDatasetAnnotation.State) {
     userQuery,
   });
 
-  console.log('🔍 [MOCK] Returning mock evaluated dataset', evaluatedDataset);
-
   return {
     // Uses state key for outer state, so it will automatically go there.
     evaluatedDatasets: evaluatedDataset,
