@@ -14,7 +14,7 @@ export const doiView = tool(
       // TODO: use Langchain's built in HTML parsing tool for this?
       // TODO: add parsing node with separate model call for this tool?
 
-      const response = await fetch(`https://doi.org/${doi}`, {
+      const response = await fetch(doi, {
         redirect: 'follow',
       });
 
@@ -43,9 +43,7 @@ export const doiView = tool(
     description:
       'View DOI (Digital Object Identifier) information for a dataset. Returns metadata about the dataset including title, authors, publisher, and citation information.',
     schema: z.object({
-      doi: z
-        .string()
-        .describe('The DOI (Digital Object Identifier) to resolve and view'),
+      doi: z.string().describe('The full DOI link to view'),
     }),
   }
 );

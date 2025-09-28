@@ -4,6 +4,9 @@ import { z } from 'zod';
 // TODO: This is a hack to store the dataset in memory so we don't have to download it multiple times
 const workingDatasetMemory: Record<string, string[]> = {};
 
+const ONE_SECOND = 1000;
+const ONE_MINUTE = 60 * ONE_SECOND;
+
 /**
  * Download and preview a dataset from data.gov (first 100 rows)
  */
@@ -14,7 +17,7 @@ export const datasetDownload = tool(
     // Check if resource is DOI link (sanity check)
     if (resourceUrl.includes('doi.org')) {
       // This small sanity check avoids downloading a common, useless link that the AI may pretend is a dataset.
-      console.log(`❌ Dataset Download - DOI link detected, skipping`);
+      console.warn(`❌ Dataset Download - DOI link detected, skipping`);
       return {
         success: false,
         error: 'DOI link detected, skipping',
@@ -28,31 +31,36 @@ export const datasetDownload = tool(
       );
       return {
         success: true,
-        preview: workingDatasetMemory[resourceUrl].slice(
+        preview: previewDataset(
+          workingDatasetMemory[resourceUrl],
           offset,
-          offset + limit
+          limit
         ),
       };
     }
 
     try {
-      // 10 second timeout - if the download takes too long, abort it.
-      const signal = AbortSignal.timeout(10000);
+      // 1 minute timeout - if the download takes too long, abort it.
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), ONE_SECOND);
 
       const response = await fetch(resourceUrl, {
         headers: {
           'Content-Type': 'text/csv',
         },
-        signal,
+        signal: controller.signal,
       });
 
       const csv = await response.text();
 
-      // Give a tiny snippet of the CSV file
-      const preview = csv.split('\n').slice(offset, offset + limit);
-
-      // Store the dataset in memory
       workingDatasetMemory[resourceUrl] = csv.split('\n');
+
+      // Give a tiny snippet of the CSV file
+      const preview = previewDataset(
+        workingDatasetMemory[resourceUrl],
+        offset,
+        limit
+      );
 
       console.log(
         `✅ Dataset Download - Dataset downloaded with ${csv.length} total rows, returning rows ${offset} to ${offset + limit}`
@@ -62,11 +70,14 @@ export const datasetDownload = tool(
         preview: preview,
       };
     } catch (error) {
-      console.log(`❌ Dataset Download - Error:`, error);
+      console.log(
+        `❌ Dataset Download - Error:`,
+        error instanceof Error ? error.message : 'Unknown error occurred'
+      );
       return {
         success: false,
-        error:
-          error instanceof Error ? error.message : 'Unknown error occurred',
+        // Give the AI a very generic error message so it doesn't retry the tool.
+        error: 'Resource cannot be downloaded. Do not retry.',
         preview: null,
       };
     }
@@ -99,3 +110,12 @@ export const datasetDownload = tool(
     }),
   }
 );
+
+/**
+ * Previews a dataset, always including the zeroth row (column headers).
+ */
+function previewDataset(dataset: string[], offset: number, limit: number) {
+  const headers = dataset[0];
+  const rows = dataset.slice(1 + offset, 1 + offset + limit);
+  return [headers, ...rows];
+}

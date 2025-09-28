@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import dataGovAgent from './agents/dataGovAgent';
-import datasetSearchAgent from './agents/datasetSearchAgent';
+import datasetEvalAgent from './agents/datasetEvalAgent';
 
 const app = new Hono();
 
@@ -45,14 +45,20 @@ v1.post('/data-gov/search', async c => {
 
 v1.post('/data-gov/test', async c => {
   // call the dataset search agent
-  const result = await datasetSearchAgent.invoke({
+  const result = await datasetEvalAgent.invoke({
     userQuery:
       'What percentage of crimes are committed by people over 80 years old?',
+    dataset: {
+      id: '02300200-a311-43b5-8cb5-10dc81ced205',
+      title: 'NYPD Arrests Data (Historic)',
+      reason:
+        'This dataset contains historical arrest data with demographic details, including age, useful for analyzing crime rates among older populations.',
+    },
   });
 
   return c.json({
     success: true,
-    result: result.datasets,
+    result,
   });
 });
 
