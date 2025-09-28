@@ -5,7 +5,6 @@ import { z } from 'zod';
 const workingDatasetMemory: Record<string, string[]> = {};
 
 const ONE_SECOND = 1000;
-const ONE_MINUTE = 60 * ONE_SECOND;
 
 /**
  * Download and preview a dataset from data.gov (first 100 rows)
@@ -40,9 +39,9 @@ export const datasetDownload = tool(
     }
 
     try {
-      // 1 minute timeout - if the download takes too long, abort it.
+      // 15 second timeout - if the download takes too long, abort it.
       const controller = new AbortController();
-      setTimeout(() => controller.abort(), ONE_MINUTE);
+      setTimeout(() => controller.abort(), 15 * ONE_SECOND);
 
       const response = await fetch(resourceUrl, {
         headers: {
