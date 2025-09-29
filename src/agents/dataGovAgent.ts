@@ -26,13 +26,11 @@ import queryAgent from './queryAgent';
  */
 const DataGovAnnotation = Annotation.Root({
   ...MessagesAnnotation.spec,
-  datasets: Annotation<DatasetWithEvaluation[]>({
-    // NOT CONCATENATION, because we need to be able to override old datasets when the search returns new ones.
-    reducer: (_, val) => val,
+  datasets: Annotation<DatasetSelection[]>({
+    reducer: (cur, val) => cur.concat(val),
     default: () => [],
   }),
   evaluatedDatasets: Annotation<DatasetWithEvaluation[]>({
-    // YES CONCATENATION, because we need to accumulate the evaluated datasets from fan-in and fan-out.
     reducer: (cur, val) => cur.concat(val),
     default: () => [],
   }),
