@@ -30,7 +30,8 @@ v1.post('/data-gov/search', async c => {
         dataset => dataset.id === result.finalDataset?.id
       ),
       evaluatedDatasets: result.evaluatedDatasets,
-      query: query,
+      datasets: result.datasets,
+      query: result.userQuery,
     });
   } catch (error) {
     console.error('Data Gov Agent error:', error);

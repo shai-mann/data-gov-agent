@@ -1,6 +1,47 @@
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 
 /**
+ * The prompt to help clarify the user's query before searching or evaluating datasets.
+ */
+export const DATA_GOV_USER_QUERY_FORMATTING_PROMPT =
+  ChatPromptTemplate.fromMessages([
+    {
+      role: 'system',
+      content: `You are an expert U.S. data.gov analyst. Your task is to expand the user’s question into a short, explicit version that makes all implicit details clear.
+
+### Instructions
+- The rewritten query should be 1–3 sentences, in natural, instructional language.
+- Make the scope explicit:
+  - If the user does not specify scope, assume the entire United States.
+- Make the answer type explicit: numeric (percentage, counts, averages, rankings) or categorical (lists, classifications).
+- If no timeframe is given, assume the most recent available data.
+- Make clear what approximations are acceptable (e.g., age 65+ instead of 80+, state-level instead of U.S.-wide).
+- Be clear and concise: the expanded query should read like instructions for what data to retrieve or compute.
+
+### Output Format
+Return your response as structured JSON in the following format:
+
+{{
+  "query": "..."
+}}
+
+### Example
+User question:
+What percentage of crimes are committed by people over 80?
+
+Expanded query:
+{{
+  "query": "Determine the percentage of crimes committed by people age 80 and older in the United States, using the most recent available data. Approximations are acceptable if the dataset uses age groups such as 65+ or covers only state-level data."
+}}
+`,
+    },
+    {
+      role: 'user',
+      content: '{query}',
+    },
+  ]);
+
+/**
  * The initial prompt for the search model, including the user's query.
  */
 export const DATA_GOV_SEARCH_PROMPT = ChatPromptTemplate.fromMessages([
@@ -181,3 +222,60 @@ Your job is to iterate through the evaluated datasets and select the single best
     content: '{query}',
   },
 ]);
+
+export const QUERY_AGENT_TABLE_NAME_PROMPT = ChatPromptTemplate.fromMessages([
+  {
+    role: 'system',
+    content: `You are a data.gov assistant. You are given a dataset and need to generate a table name for it.
+
+    The dataset is: {dataset}`,
+  },
+]);
+
+export const QUERY_AGENT_SQL_QUERY_PROMPT = ChatPromptTemplate.fromMessages([
+  {
+    role: 'system',
+    content: `You are a data.gov assistant. You are given a dataset and need to generate a SQL query to answer the user's question.
+
+    ### Tools:
+    - sqlQuery: Query the database. IMPORTANT: This tool only accepts valid SQL queries.
+    - packageShow: Show the metadata of the table, including potential other resources such as DOI links.
+    - datasetDownload: Download the dataset and view some of the data. Use limits and offsets to view up to 20 rows of the dataset.
+    - doiView: View the dataset's DOI webpage.
+
+    ### Workflow:
+    1. Use any combination of packageShow, datasetDownload, and doiView to get a sense of the dataset and what it contains.
+    2. Construct a valid SQL query to answer the user's question and run it.
+    3. Examine the results of the query and determine if it is a valid answer to the user's question.
+    4. If the query is not a valid answer, go back to step 2.
+    5. Once you have a valid answer, return the query you used.
+
+    ### Note:
+    - Your strongest tool for understanding the dataset is datasetDownload. Use it to view up to 20 rows of the dataset.
+
+    The table is named: {tableName}`,
+  },
+  {
+    role: 'user',
+    content: '{query}',
+  },
+]);
+
+export const QUERY_AGENT_SQL_QUERY_OUTPUT_PROMPT =
+  ChatPromptTemplate.fromMessages([
+    {
+      role: 'system',
+      content: `You are a data.gov assistant. Your colleague has just executed a SQL query to answer a user's question, and needs you to format the output into a clear, concise summary of the resulting data.
+
+    ### The User's Original Question
+      User's Question: {userQuery}
+
+    ### Output Format
+    - **Summary**: A clear, concise summary of the resulting data. Include exact numbers and percentages where applicable. Structure it as an answer to the user's question.
+    - **Table**: The resulting table of data. Leave this in as raw a format as possible.
+    - **Query**: The SQL query that was executed.
+
+    The SQL query is: {sqlQuery}
+    The results of the query are: {results}`,
+    },
+  ]);

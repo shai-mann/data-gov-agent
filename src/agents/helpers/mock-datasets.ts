@@ -1,114 +1,168 @@
 import { DatasetSelection, DatasetWithEvaluation } from '../../lib/annotation';
 
+export const MOCK_USER_QUERY = {
+  query:
+    'Determine the percentage of crimes committed by people age 80 and older in the United States, using the most recent available data. Approximations are acceptable if the dataset uses age groups such as 65+ or covers only state-level data.',
+};
+
 /*
  * Mock datasets for testing.
  */
 export const MOCK_DATASETS = [
   {
+    id: '37f7cedc-4ed8-4569-99a9-0c36f1af7152',
+    title: 'Arrest Data',
+    reason:
+      'This dataset provides national arrest estimates detailed by offense, sex, age, and race, which can help analyze crime rates among older populations.',
+  },
+  {
     id: 'e219a097-b2fe-4c81-bf07-b6e27bf0b09c',
     title: 'Age-by-Race Specific Crime Rates, 1965-1985:  [United States]',
     reason:
-      'This dataset examines age-specific crime rates, which can help analyze the percentage of crimes committed by individuals over 80 years old.',
+      'This dataset examines age-specific crime rates, which can provide insights into crime committed by older individuals.',
   },
   {
-    id: 'f468fe8a-a319-464f-9374-f77128ffc9dc',
-    title: 'NYPD Arrest Data (Year to Date)',
+    id: '87dbbdaf-8ea8-427d-acd8-8915231cca65',
+    title: 'Violent Crime Rate',
     reason:
-      'This dataset includes demographic information about offenders, including age, which can be used to determine the percentage of crimes committed by those over 80.',
+      'This dataset contains data on violent crime rates in California, which can be used to approximate crime rates among older populations.',
   },
   {
-    id: 'de7df4d0-aab6-4de1-9329-1db57e84a22e',
-    title: 'NYPD Shooting Incident Data (Historic)',
+    id: '6c4e2995-7bdf-4c37-a269-386348be7e65',
+    title: 'Violence Reduction - Victim Demographics - Aggregated',
     reason:
-      'This dataset provides information on shooting incidents, including offender demographics, which can help assess crimes committed by older individuals.',
-  },
-  {
-    id: '02300200-a311-43b5-8cb5-10dc81ced205',
-    title: 'NYPD Arrests Data (Historic)',
-    reason:
-      'This dataset contains historical arrest data with demographic details, including age, useful for analyzing crime rates among older populations.',
+      "This dataset includes demographic information on violent crime victims, which may include age breakdowns relevant to the user's query.",
   },
   {
     id: '9f440483-56ed-4d7c-a464-c660949808ba',
     title: 'Felony Sentences',
     reason:
-      'This dataset includes demographic information on offenders, such as age, which can be analyzed to find the percentage of crimes committed by those over 80.',
+      'This dataset includes demographic information such as age, which can help analyze crime rates among older individuals.',
   },
   {
-    id: 'f6731209-f2b6-4786-9ce2-306d9accb8f6',
-    title:
-      'Drug overdose death rates, by drug type, sex, age, race, and Hispanic origin: United States',
+    id: 'aa2c447c-5e77-4791-81d5-15630312f667',
+    title: 'Uniform Crime Reporting Program Data Series',
     reason:
-      'This dataset provides age-specific death rates, which can be useful in understanding crime-related deaths among older populations.',
+      'This dataset provides comprehensive crime data, including age breakdowns, which can help analyze crime rates among older populations.',
   },
   {
-    id: '37f7cedc-4ed8-4569-99a9-0c36f1af7152',
-    title: 'Arrest Data',
+    id: '2b050709-22ca-48b7-a0dd-35933b74f1e8',
+    title: 'National Prisoner Statistics (NPS) Series',
     reason:
-      'This dataset provides national arrest estimates detailed by age, which can help analyze the percentage of crimes committed by individuals over 80.',
+      'This dataset provides data on prisoners, including age demographics, which can help analyze crime rates among older individuals.',
   },
   {
-    id: 'c5f53aa3-78a2-4b3b-acc2-57396fa30b6e',
-    title: 'Mental Health Care in the Last 4 Weeks',
+    id: '7440ee03-99c9-45f9-9fbb-4bfe9469f19c',
+    title: 'Electronic Police Report 2021',
     reason:
-      'This dataset includes demographic information that may help in understanding the relationship between age and crime.',
+      'This dataset includes detailed police reports with demographic information, including age, which can help analyze crime rates among older individuals.',
   },
   {
-    id: '8dc5d5f6-9799-4230-9a90-7d7d77853cbe',
-    title: 'NCHS - Injury Mortality: United States',
+    id: 'df1de6e0-a78a-41be-be43-7bc04d8dad42',
+    title: '21st Century Corporate Financial Fraud, United States, 2005-2010',
     reason:
-      'This dataset provides information on injury mortality, which can be relevant to understanding crime rates among older individuals.',
+      'While focused on corporate fraud, this dataset may provide insights into demographic trends related to crime, including age.',
+  },
+  {
+    id: '32b1872e-1faf-477e-99fc-bcad2a69729a',
+    title: 'NCHS - Leading Causes of Death: United States',
+    reason:
+      'This dataset presents age-adjusted death rates, which can provide insights into mortality related to crime among older populations.',
   },
   {
     id: '405652c8-9146-4e16-8604-c6c04892a956',
     title:
       'Death rates for suicide, by sex, race, Hispanic origin, and age: United States',
     reason:
-      'This dataset provides age-specific death rates, which can be useful in understanding crime-related deaths among older populations.',
+      'This dataset provides death rates by age, which can help analyze trends related to crime and mortality among older individuals.',
+  },
+  {
+    id: 'f6731209-f2b6-4786-9ce2-306d9accb8f6',
+    title: 'NCHS - Injury Mortality: United States',
+    reason:
+      'This dataset describes injury mortality, which can be relevant for understanding crime-related deaths among older populations.',
+  },
+  {
+    id: 'e3725a5b-d1fd-46e8-bb68-c999d3061e0a',
+    title:
+      'Provisional COVID-19 death counts, rates, and percent of total deaths, by jurisdiction of residence',
+    reason:
+      'This dataset includes demographic characteristics, including age, which can help analyze trends related to crime and mortality among older individuals.',
+  },
+  {
+    id: '5cb8d78e-54d3-4a36-bb51-190c316829f7',
+    title: 'Motor Vehicle Collisions - Crashes',
+    reason:
+      'This dataset includes details on crash events, which may provide insights into incidents involving older individuals.',
+  },
+  {
+    id: '1c249f51-eb6d-4f04-86fc-a7979bcc8518',
+    title: 'Federal Student Loan Portfolio',
+    reason:
+      'This dataset includes demographic information that may provide insights into the financial behaviors of older individuals, which can be related to crime.',
   },
 ] satisfies DatasetSelection[];
 
 export const MOCK_EVALUATED_DATASETS = [
   {
-    id: 'f468fe8a-a319-464f-9374-f77128ffc9dc',
-    title: 'NYPD Arrest Data (Year to Date)',
+    id: '6c4e2995-7bdf-4c37-a269-386348be7e65',
+    title: 'Violence Reduction - Victim Demographics - Aggregated',
     reason:
-      'This dataset includes demographic information about offenders, including age, which can be used to determine the percentage of crimes committed by those over 80.',
-    evaluation: {
-      usable: true,
-      score: 85,
-      reasoning:
-        'The dataset includes demographic information about offenders, specifically the "AGE_GROUP" column, which can be used to determine the percentage of crimes committed by individuals over 80 years old. The data is structured and provides a comprehensive view of arrests, allowing for analysis of age-related crime statistics. For example, queries can be made to count the total arrests and those specifically for the age group "80+" to calculate the desired percentage.',
-      bestResource:
-        '[NYPD Arrest Data (Year to Date) - CSV](https://data.cityofnewyork.us/api/views/uip8-fykc/rows.csv?accessType=DOWNLOAD)',
-    },
-  },
-  {
-    id: 'de7df4d0-aab6-4de1-9329-1db57e84a22e',
-    title: 'NYPD Shooting Incident Data (Historic)',
-    reason:
-      'This dataset provides information on shooting incidents, including offender demographics, which can help assess crimes committed by older individuals.',
+      "This dataset includes demographic information on violent crime victims, which may include age breakdowns relevant to the user's query.",
     evaluation: {
       usable: true,
       score: 75,
       reasoning:
-        "The dataset includes offender demographics, specifically the age group of perpetrators, which is essential for determining the percentage of crimes committed by individuals over 80 years old. The CSV format allows for easy analysis of the data. For example, queries can be made to filter incidents where the perpetrator's age group includes '80+' and compare that to the total number of incidents.",
+        'The dataset provides demographic information on violent crime victims, including age breakdowns. It includes columns for age groups, which can help approximate the percentage of crimes committed by individuals aged 80 and older. The dataset aggregates data by quarter and includes various demographic factors, making it suitable for analysis. For example, queries can be made to sum the number of victims aged 80+ and compare it to the total number of victims to calculate the percentage.',
       bestResource:
-        '[NYPD Shooting Incident Data (Historic) - CSV](https://data.cityofnewyork.us/api/views/833y-fsy8/rows.csv?accessType=DOWNLOAD)',
+        '[CSV Dataset](https://data.cityofchicago.org/api/views/gj7a-742p/rows.csv?accessType=DOWNLOAD)',
     },
   },
   {
     id: '9f440483-56ed-4d7c-a464-c660949808ba',
     title: 'Felony Sentences',
     reason:
-      'This dataset includes demographic information on offenders, such as age, which can be analyzed to find the percentage of crimes committed by those over 80.',
+      'This dataset includes demographic information such as age, which can help analyze crime rates among older individuals.',
     evaluation: {
       usable: true,
       score: 85,
       reasoning:
-        'The dataset contains demographic information, including age groups of offenders, which can be analyzed to determine the percentage of crimes committed by individuals over 80 years old. The columns include "AGE_GROUP" and various offense details, allowing for specific queries regarding age demographics and crime rates. For example, one could filter the dataset for entries where "AGE_GROUP" indicates "80+" and compare that to the total number of offenses to calculate the desired percentage.',
+        'The dataset contains demographic information, including age groups, which is essential for analyzing crime rates among older individuals. The "AGE_GROUP" column can help identify the percentage of crimes committed by individuals aged 80 and older, or at least those in the 65+ category. The dataset includes various offenses and sentencing details, which can provide a comprehensive view of felony crimes.',
       bestResource:
-        '[CSV Dataset](https://opendata.dc.gov/api/download/v1/items/f92f4556f26b4737a040fb996eaefca3/csv?layers=40)',
+        'https://opendata.dc.gov/api/download/v1/items/f92f4556f26b4737a040fb996eaefca3/csv?layers=40',
+    },
+  },
+  {
+    id: '7440ee03-99c9-45f9-9fbb-4bfe9469f19c',
+    title: 'Electronic Police Report 2021',
+    reason:
+      'This dataset includes detailed police reports with demographic information, including age, which can help analyze crime rates among older individuals.',
+    evaluation: {
+      usable: true,
+      score: 75,
+      reasoning:
+        'The dataset contains detailed police reports with demographic information, including the age of offenders and victims. This allows for the analysis of crime rates among individuals aged 80 and older. The presence of the "Offender_Age" column is particularly useful for determining the percentage of crimes committed by this age group. However, the dataset is limited to New Orleans, which may not represent national trends.',
+      bestResource:
+        '[CSV Dataset](https://data.nola.gov/api/views/6pqh-bfxa/rows.csv?accessType=DOWNLOAD)',
+    },
+  },
+  {
+    id: 'f6731209-f2b6-4786-9ce2-306d9accb8f6',
+    title: 'NCHS - Injury Mortality: United States',
+    reason:
+      'This dataset describes injury mortality, which can be relevant for understanding crime-related deaths among older populations.',
+    evaluation: {
+      usable: true,
+      score: 70,
+      reasoning:
+        'The dataset provides drug overdose death rates, which can be relevant for understanding mortality related to crime among older populations. The preview shows that it includes age groups, which may allow for analysis of the 80+ age demographic. However, it does not directly provide crime data, but rather focuses on mortality rates, which could be indirectly related to crime statistics.',
+      bestResource:
+        '[CSV Dataset](https://data.cdc.gov/api/views/95ax-ymtc/rows.csv?accessType=DOWNLOAD)',
     },
   },
 ] satisfies DatasetWithEvaluation[];
+
+export const MOCK_FINAL_SELECTION = {
+  type: 'dataset',
+  id: '9f440483-56ed-4d7c-a464-c660949808ba',
+};
