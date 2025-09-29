@@ -13,12 +13,6 @@ import {
 import { Send } from '@langchain/langgraph';
 import searchAgent from './datasetSearchAgent';
 import evalAgent from './datasetEvalAgent';
-import {
-  MOCK_DATASETS,
-  MOCK_EVALUATED_DATASETS,
-  MOCK_FINAL_SELECTION,
-  MOCK_USER_QUERY,
-} from './helpers/mock-datasets';
 import { openai } from '../llms';
 import { z } from 'zod';
 import {
@@ -71,8 +65,6 @@ async function userQueryFormattingNode(state: typeof DataGovAnnotation.State) {
 
   const result = await formattingStructuredModel.invoke(prompt);
 
-  // const result = MOCK_USER_QUERY;
-
   return { userQuery: result.query };
 }
 
@@ -88,8 +80,6 @@ async function searchNode(state: typeof DataGovAnnotation.State) {
       recursionLimit: 30,
     }
   );
-
-  // const datasets = MOCK_DATASETS;
 
   return {
     userQuery,
@@ -113,10 +103,6 @@ async function evalNode(state: typeof EvalDatasetAnnotation.State) {
     dataset,
     userQuery,
   });
-
-  // const evaluatedDataset = MOCK_EVALUATED_DATASETS.find(
-  //   d => d.id === dataset.id
-  // )!;
 
   // If the dataset is not relevant, don't add it to the state.
   if (evaluatedDataset.evaluation?.usable === false) {
@@ -149,13 +135,11 @@ async function datasetFinalSelectionNode(
   console.log('🔍 [CORE] Selecting final dataset...');
 
   const result = await structuredModel.invoke(prompt);
-  // const result = MOCK_FINAL_SELECTION;
 
   if (result.type === 'none') {
     console.log('🔍 [CORE] No dataset selected. Repeating process...');
 
-    // Clear the state so we can start over.
-    // TODO: Clear the state, but add the datasets we evaluated to a blacklist for next time.
+    // Exit early.
     return {};
   }
 
@@ -186,9 +170,8 @@ async function shouldContinueWithSelection(
   state: typeof DataGovAnnotation.State
 ) {
   const { finalDataset } = state;
-  // If no dataset is selected, we need to repeat the process.
-  // Otherwise, move on to querying the dataset.
-  return finalDataset ? 'query' : 'search';
+  // If no dataset is selected, we end early.
+  return finalDataset ? 'query' : END;
 }
 
 // Build the data-gov agent workflow
