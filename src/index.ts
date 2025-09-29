@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import dataGovAgent from './agents/dataGovAgent';
 import queryAgent from './agents/queryAgent';
-import datasetSearchAgent from './agents/datasetSearchAgent';
+import datasetSearchAgent from './agents/searchAgent';
 
 const app = new Hono();
 

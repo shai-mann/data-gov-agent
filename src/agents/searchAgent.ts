@@ -98,7 +98,7 @@ async function processDatasetSelectionNode(
     .filter(m => !state.datasets.some(d => d.id === m.id));
 
   if (toolMessages.length === 0) {
-    console.log('🔍 No selectDataset tool calls found');
+    console.log('🔍 No new selectDataset tool calls found');
     return {};
   }
 
