@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import dataGovAgent from './agents/dataGovAgent';
 import queryAgent from './agents/queryAgent';
+import datasetSearchAgent from './agents/datasetSearchAgent';
 
 const app = new Hono();
 
@@ -47,7 +48,38 @@ v1.post('/data-gov/search', async c => {
   }
 });
 
-v1.post('/query', async c => {
+v1.post('/test/dataset-search', async c => {
+  try {
+    const { query } = await c.req.json();
+
+    if (!query) {
+      return c.json({ error: 'Query parameter is required' }, 400);
+    }
+
+    const result = await datasetSearchAgent.invoke({
+      userQuery: query,
+    });
+
+    return c.json({
+      success: true,
+      result: result.datasets,
+      userQuery: result.userQuery,
+      messages: result.messages,
+    });
+  } catch (error) {
+    console.error('Search Agent error:', error);
+    return c.json(
+      {
+        success: false,
+        error:
+          error instanceof Error ? error.message : 'Unknown error occurred',
+      },
+      500
+    );
+  }
+});
+
+v1.post('/test/query', async c => {
   try {
     const { query, dataset } = await c.req.json();
 
