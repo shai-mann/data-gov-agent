@@ -8,6 +8,7 @@ import {
 import {
   QUERY_AGENT_SQL_QUERY_OUTPUT_PROMPT,
   QUERY_AGENT_SQL_QUERY_PROMPT,
+  QUERY_AGENT_SQL_REMINDER_PROMPT,
   QUERY_AGENT_TABLE_NAME_PROMPT,
 } from '../lib/prompts';
 import {
@@ -30,9 +31,25 @@ const conn = await instance.connect();
 const sqlQueryTool = tool(
   async ({ query }) => {
     try {
-      const rows = await conn.run(query);
-      return JSON.stringify(rows, null, 2);
+      console.log('🔍 [QUERY] Executing query: "', query, '"');
+      const result = await conn.runAndReadAll(query);
+
+      // Create column metadata
+      const columns = result.columnNames().map((c, i) => {
+        return {
+          name: c,
+          type: result.columnType(i),
+        };
+      });
+
+      const output = JSON.stringify({
+        rows: result.getRowObjectsJson(),
+        columns,
+      });
+
+      return output;
     } catch (err) {
+      console.error('🔍 [QUERY] Error executing query: ', err);
       return `Error executing query: ${err instanceof Error ? err.message : 'Unknown'}`;
     }
   },
@@ -89,6 +106,7 @@ async function setupNode(state: typeof DatasetEvalAnnotation.State) {
 
   // Construct the table in DuckDB and load the dataset into it
   try {
+    console.log('🔍 [QUERY] Creating table:', table);
     await conn.run(
       `CREATE OR REPLACE TABLE ${table} AS SELECT * FROM read_csv_auto('${dataset.evaluation.bestResource}')`
     );
@@ -102,6 +120,9 @@ async function setupNode(state: typeof DatasetEvalAnnotation.State) {
   const prompt = await QUERY_AGENT_SQL_QUERY_PROMPT.formatMessages({
     tableName: table,
     query: userQuery,
+    context: dataset.evaluation.reasoning,
+    datasetLink: dataset.evaluation.bestResource,
+    datasetId: dataset.id,
   });
 
   return {
@@ -113,7 +134,9 @@ async function setupNode(state: typeof DatasetEvalAnnotation.State) {
 async function modelNode(state: typeof DatasetEvalAnnotation.State) {
   console.log('🔍 [QUERY] Evaluating...');
 
-  const result = await model.invoke(state.messages);
+  const prompt = await QUERY_AGENT_SQL_REMINDER_PROMPT.formatMessages({});
+
+  const result = await model.invoke([...state.messages, ...prompt]);
 
   return {
     messages: result,
@@ -123,11 +146,10 @@ async function modelNode(state: typeof DatasetEvalAnnotation.State) {
 async function outputNode(state: typeof DatasetEvalAnnotation.State) {
   console.log('🔍 [EVAL] Structuring output...');
 
-  const { messages, sqlQuery, userQuery } = state;
+  const { messages, userQuery } = state;
   const lastMessage = messages.at(-1) as AIMessage;
 
   const prompt = await QUERY_AGENT_SQL_QUERY_OUTPUT_PROMPT.formatMessages({
-    sqlQuery,
     userQuery,
     results: lastMessage.content as string,
   });

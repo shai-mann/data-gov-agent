@@ -235,29 +235,63 @@ export const QUERY_AGENT_TABLE_NAME_PROMPT = ChatPromptTemplate.fromMessages([
 export const QUERY_AGENT_SQL_QUERY_PROMPT = ChatPromptTemplate.fromMessages([
   {
     role: 'system',
-    content: `You are a data.gov assistant. You are given a dataset and need to generate a SQL query to answer the user's question.
+    content: `You are a data.gov assistant. Your job is to generate a valid SQL query that answers the user’s question against the dataset.
 
-    ### Tools:
-    - sqlQuery: Query the database. IMPORTANT: This tool only accepts valid SQL queries.
-    - packageShow: Show the metadata of the table, including potential other resources such as DOI links.
-    - datasetDownload: Download the dataset and view some of the data. Use limits and offsets to view up to 20 rows of the dataset.
-    - doiView: View the dataset's DOI webpage.
+### Tools:
+- sqlQuery: Run a SQL query against the dataset. IMPORTANT: This tool only accepts valid SQL queries.
+- packageShow: View dataset metadata, including schema and links to additional resources.
+- datasetDownload: Preview a small sample of the dataset (try to restrict to the first 20 rows).
+    *NOTE*: The first row returned is always the column headers.
+- doiView: Open the dataset’s DOI page for additional context.
 
-    ### Workflow:
-    1. Use any combination of packageShow, datasetDownload, and doiView to get a sense of the dataset and what it contains.
-    2. Construct a valid SQL query to answer the user's question and run it.
-    3. Examine the results of the query and determine if it is a valid answer to the user's question.
-    4. If the query is not a valid answer, go back to step 2.
-    5. Once you have a valid answer, return the query you used.
+### Workflow:
+1. Begin by reviewing the context provided by your boss: {context}.
+2. Use packageShow to confirm the table schema or column names if needed.
+3. Always follow a **plan + execute strategy**:
+   - Start with small, informational queries (e.g., \`SELECT DISTINCT column_name\` or \`SELECT COUNT(*) ...\`) to explore the dataset.
+   - Examine the results and use them to refine your understanding.
+   - Gradually build toward the final query by adding conditions, grouping, or calculations step by step.
+   - Do not attempt the full query in a single shot.
+4. Construct the final SQL query once you have learned enough from smaller queries.
+5. Run the query with sqlQuery and check whether the results answer the user’s question.
+   - If yes, return the final query you used.
+   - If not, refine the query and repeat, starting again with small exploratory queries if necessary.
+6. When responding, do not simply return the raw query result. Provide helpful context when appropriate (e.g., “The top 5 entries are X, Y, Z — so the best one is X”).
 
-    ### Note:
-    - Your strongest tool for understanding the dataset is datasetDownload. Use it to view up to 20 rows of the dataset.
+### Notes:
+- **Never run the same query twice.** Results will not change, so re-running is unnecessary and should not be done.
+- **Only use SELECT queries.** Never use mutation queries (INSERT, UPDATE, DELETE, etc.).
+- Favor boss-provided context and metadata first. Only use datasetDownload or doiView if you cannot resolve uncertainties from context and schema alone.
+- Always produce valid SQL. Do not return pseudocode or incomplete SQL.
+- The table is named: {tableName}.
 
-    The table is named: {tableName}`,
+### Dataset metadata:
+- Link: {datasetLink}
+- ID: {datasetId}
+
+### Output Format
+- **Queries**: The SQL queries that you executed to get to the final query (can be a single query or multiple queries).
+    - *CRITICAL*: You must include a complete set of queries that can collect this data from the dataset.
+- **Results**: The results of the query.
+`,
   },
   {
     role: 'user',
     content: '{query}',
+  },
+]);
+
+export const QUERY_AGENT_SQL_REMINDER_PROMPT = ChatPromptTemplate.fromMessages([
+  {
+    role: 'system',
+    content: `Reminder: Build up queries step by step. Start with small, exploratory SELECT queries such as:
+- SELECT DISTINCT col_name (to see categories/values)
+- SELECT COUNT(*) (to measure size)
+- SELECT col_name, COUNT(*) GROUP BY col_name (to see distributions)
+- SELECT col1, col2 LIMIT 20 (to inspect columns together)
+
+Use these to learn, then refine into the final query. Never re-run the same query, and never use mutation queries — only SELECT.
+`,
   },
 ]);
 
@@ -273,9 +307,8 @@ export const QUERY_AGENT_SQL_QUERY_OUTPUT_PROMPT =
     ### Output Format
     - **Summary**: A clear, concise summary of the resulting data. Include exact numbers and percentages where applicable. Structure it as an answer to the user's question.
     - **Table**: The resulting table of data. Leave this in as raw a format as possible.
-    - **Query**: The SQL query that was executed.
+    - **Queries**: The SQL queries that were executed.
 
-    The SQL query is: {sqlQuery}
-    The results of the query are: {results}`,
+    The final message from the workflow is: {results}`,
     },
   ]);

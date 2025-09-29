@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import dataGovAgent from './agents/dataGovAgent';
+import queryAgent from './agents/queryAgent';
 
 const app = new Hono();
 
@@ -35,6 +36,42 @@ v1.post('/data-gov/search', async c => {
     });
   } catch (error) {
     console.error('Data Gov Agent error:', error);
+    return c.json(
+      {
+        success: false,
+        error:
+          error instanceof Error ? error.message : 'Unknown error occurred',
+      },
+      500
+    );
+  }
+});
+
+v1.post('/query', async c => {
+  try {
+    const { query, dataset } = await c.req.json();
+
+    if (!query || !dataset) {
+      return c.json({ error: 'Query and dataset are required' }, 400);
+    }
+
+    const result = await queryAgent.invoke(
+      {
+        userQuery: query,
+        dataset,
+      },
+      {
+        recursionLimit: 40, // TEMPORARY testing to see how long it takes to get there
+      }
+    );
+
+    return c.json({
+      success: true,
+      result: result.summary,
+      messages: result.messages,
+    });
+  } catch (error) {
+    console.error('Query Agent error:', error);
     return c.json(
       {
         success: false,
