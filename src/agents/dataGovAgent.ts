@@ -69,9 +69,9 @@ async function userQueryFormattingNode(state: typeof DataGovAnnotation.State) {
 
   console.log('🔍 [CORE] Formatting user query...');
 
-  // const result = await formattingStructuredModel.invoke(prompt);
+  const result = await formattingStructuredModel.invoke(prompt);
 
-  const result = MOCK_USER_QUERY;
+  // const result = MOCK_USER_QUERY;
 
   return { userQuery: result.query };
 }
@@ -79,17 +79,17 @@ async function userQueryFormattingNode(state: typeof DataGovAnnotation.State) {
 async function searchNode(state: typeof DataGovAnnotation.State) {
   const { userQuery } = state;
 
-  // const { datasets } = await searchAgent.invoke(
-  //   {
-  //     userQuery,
-  //   },
-  //   {
-  //     // slightly above the default of 20, to allow more iteration as it finds datasets.
-  //     recursionLimit: 30,
-  //   }
-  // );
+  const { datasets } = await searchAgent.invoke(
+    {
+      userQuery,
+    },
+    {
+      // slightly above the default of 20, to allow more iteration as it finds datasets.
+      recursionLimit: 30,
+    }
+  );
 
-  const datasets = MOCK_DATASETS;
+  // const datasets = MOCK_DATASETS;
 
   return {
     userQuery,
@@ -109,14 +109,14 @@ function continueToEval(state: typeof DataGovAnnotation.State) {
 async function evalNode(state: typeof EvalDatasetAnnotation.State) {
   const { dataset, userQuery } = state;
 
-  // const { dataset: evaluatedDataset } = await evalAgent.invoke({
-  //   dataset,
-  //   userQuery,
-  // });
+  const { dataset: evaluatedDataset } = await evalAgent.invoke({
+    dataset,
+    userQuery,
+  });
 
-  const evaluatedDataset = MOCK_EVALUATED_DATASETS.find(
-    d => d.id === dataset.id
-  )!;
+  // const evaluatedDataset = MOCK_EVALUATED_DATASETS.find(
+  //   d => d.id === dataset.id
+  // )!;
 
   // If the dataset is not relevant, don't add it to the state.
   if (evaluatedDataset.evaluation?.usable === false) {
@@ -148,8 +148,8 @@ async function datasetFinalSelectionNode(
 
   console.log('🔍 [CORE] Selecting final dataset...');
 
-  // const result = await structuredModel.invoke(prompt);
-  const result = MOCK_FINAL_SELECTION;
+  const result = await structuredModel.invoke(prompt);
+  // const result = MOCK_FINAL_SELECTION;
 
   if (result.type === 'none') {
     console.log('🔍 [CORE] No dataset selected. Repeating process...');

@@ -53,7 +53,7 @@ The user wants datasets that can answer their question: "{query}".
 
 Your task is to provide a list of the **most relevant datasets** using only the tools provided. You have access to:
 
-- packageNameSearch: Find datasets by name or similar keywords (metadata may be limited). Use very few keywords here, and skip obvious terms like "U.S."
+- packageNameSearch: Find datasets by name or similar keywords (metadata may be limited). Use one keyword (max two) here, and skip obvious terms like "U.S."
 - packageSearch: Search for datasets by keywords (includes metadata). Use more targeted keywords here, focusing on the user’s query and any promising dataset names you found in the previous step.
 - selectDataset: Select a dataset by providing its ID, title, and a short reason why it may help answer the user’s question.
 
