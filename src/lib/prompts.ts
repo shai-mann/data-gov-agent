@@ -81,7 +81,9 @@ export const DATA_GOV_EVALUATE_DATASET_PROMPT = ChatPromptTemplate.fromMessages(
 - **datasetDownload** → Preview a dataset, including the zeroth row (column headers). Use only for resources with format = "CSV" or valid mimeType.
 - **doiView** → Use on DOI links to view context of the dataset.
 
-⚠️ Do not use datasetDownload on DOI links or resources without valid CSV/mimeType.
+⚠️ CRITICAL: Do not use datasetDownload on DOI links or resources without valid CSV mimeType.
+Valid: "text/csv", "application/csv".
+Invalid: "text/plain", "application/json", "text/html", empty format/mimeType.
 
 ### Workflow
 **Rule #1: Each resource is matched to exactly one tool. Each tool may only be used once per resource. No retries.**
@@ -89,24 +91,25 @@ export const DATA_GOV_EVALUATE_DATASET_PROMPT = ChatPromptTemplate.fromMessages(
 
 1. Run **packageShow** to list all resources.
 2. For each resource, classify it:
-   - If resource is CSV/mimeType → assign to datasetDownload.
+   - If resource is CSV mimeType → assign to datasetDownload.
    - If resource is a DOI link → assign to doiView.
    - Otherwise → ignore the resource.
 3. Batch all assigned tool calls and examine the outputs.
-   - If a tool fails or times out, DO NOT RETRY — just treat that resource as providing no usable data.
-4. After reviewing all tool outputs, decide if the dataset is **Relevant** or **Not Relevant**.
+   - If a tool fails or times out, DO NOT RETRY — treat that resource as unusable.
+4. After reviewing all tool outputs, decide whether the dataset is **Usable** or **Not Usable**.
 
 ### Decision Rules
-- **Relevant**: Dataset can provide a direct factual answer (numeric, categorical, ranking, etc.).
-- **Not Relevant**: No usable resources, or data does not fully answer the question.
-- Missing/empty format or mimeType = Not Relevant.
+- **Usable** = at least one usable dataset resource exists (CSV download works and contains columns that could help answer the question).
+- **Not Usable** = no usable dataset resources OR the data cannot provide a concrete factual answer.
+- If **Best Resource = None**, then **Usability must = Not Usable**.
+- CRITICAL: DOI links NEVER count as usable resources. They provide context only.
 
 ### Output Format
-- **Relevance**: "Relevant" or "Not Relevant"
-- **Best Resource**: URL of most useful DATASET resource (or "None")
-- **Reasoning**: Short explanation, include pros/cons and example queries if relevant
+- **Usability**: "Usable" or "Not Usable"
+- **Best Resource**: URL of the most useful CSV dataset resource (never DOI; "None" only if Not Usable)
+- **Reasoning**: Short explanation, include pros/cons and example queries if usable
 - **Scoping**: Does the dataset cover the full scope of the user’s question?
-- **Score** (0–100): Higher if the dataset can provide a direct, factual answer with usable resources.
+- **Score (0–100)**: Higher if the dataset can provide a direct, factual answer with usable resources.
 `,
     },
     {
@@ -142,5 +145,39 @@ export const DATA_GOV_EVALUATE_OUTPUT_PROMPT = ChatPromptTemplate.fromMessages([
   {
     role: 'user',
     content: '{evaluation}',
+  },
+]);
+
+export const DATA_GOV_FINAL_SELECTION_PROMPT = ChatPromptTemplate.fromMessages([
+  {
+    role: 'system',
+    content: `You work for a team of expert U.S. data.gov analysts. They have just finished evaluating a set of datasets, and need you to select one of them to use.
+
+Your task is to select the dataset that is most likely to provide a concrete, complete, fact-based answer to the user’s question.
+
+Key Instructions:
+1. The answer must be concrete, factual, and directly supported by the dataset. Examples include:
+   - "What are the most powerful nuclear reactors in the US?" → A dataset that lists nuclear reactors, including their power output, so that they can be ranked.
+   - "What percentage of crimes are committed by people over 80?" → A dataset that provides crime data broken down by age groups.
+
+2. Scope:
+   - If the user provides no specific scope, assume they are asking about the entire United States.
+   - If no scope is provided and a dataset only covers a limited region (e.g., New York only), that dataset may still be considered a good fit, but it is not a perfect fit.
+
+3. Selection Criteria:
+   - If no dataset can provide a concrete, factual answer, return type = "none".
+   - If a dataset can provide an approximate or partial but still meaningful answer, return type = "dataset".
+   - If a dataset is a perfect fit for the question (national scope and precise variables needed), return type = "dataset".
+
+Your job is to iterate through the evaluated datasets and select the single best one that most closely fits the user’s question, applying the rules above.
+    `,
+  },
+  {
+    role: 'system',
+    content: 'The datasets are: {datasets}',
+  },
+  {
+    role: 'user',
+    content: '{query}',
   },
 ]);

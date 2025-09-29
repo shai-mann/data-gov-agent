@@ -6,13 +6,13 @@ export type DatasetWithEvaluation = DatasetSelection & {
   // Optional because it may not have been evaluated yet
   evaluation?:
     | {
-        relevant: true;
+        usable: true;
         score: number;
         reasoning: string;
         bestResource: string;
       }
     | {
-        relevant: false;
+        usable: false;
       };
 };
 
@@ -21,9 +21,9 @@ export const DatasetWithEvaluationSchema = z.object({
   title: z.string(),
   reason: z.string(),
   evaluation: z
-    .discriminatedUnion('relevant', [
+    .discriminatedUnion('usable', [
       z.object({
-        relevant: z.literal(true),
+        usable: z.literal(true),
         score: z.number(),
         reasoning: z.string(),
         bestResource: z
@@ -33,7 +33,7 @@ export const DatasetWithEvaluationSchema = z.object({
           ),
       }),
       z.object({
-        relevant: z.literal(false),
+        usable: z.literal(false),
       }),
     ])
     .optional()

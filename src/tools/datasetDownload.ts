@@ -10,7 +10,7 @@ const ONE_SECOND = 1000;
  * Download and preview a dataset from data.gov (first 100 rows)
  */
 export const datasetDownload = tool(
-  async ({ resourceUrl, format = 'CSV', limit = 3, offset = 0 }) => {
+  async ({ resourceUrl, format = 'CSV', limit = 20, offset = 0 }) => {
     console.log(`📥 Dataset Download - URL: ${resourceUrl}, Format: ${format}`);
 
     // Check if resource is DOI link (sanity check)

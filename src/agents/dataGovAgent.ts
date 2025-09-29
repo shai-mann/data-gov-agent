@@ -13,6 +13,9 @@ import {
   MOCK_DATASETS,
   MOCK_EVALUATED_DATASETS,
 } from './helpers/mock-datasets';
+import { openai } from '../llms';
+import { z } from 'zod';
+import { DATA_GOV_FINAL_SELECTION_PROMPT } from '../lib/prompts';
 
 /**
  * Main annotation for the data-gov agent.
@@ -29,6 +32,7 @@ const DataGovAnnotation = Annotation.Root({
     reducer: (cur, val) => cur.concat(val),
     default: () => [],
   }),
+  finalDataset: Annotation<DatasetWithEvaluation | null>(),
   userQuery: Annotation<string>(),
 });
 
@@ -73,17 +77,17 @@ function continueToEval(state: typeof DataGovAnnotation.State) {
 async function evalNode(state: typeof EvalDatasetAnnotation.State) {
   const { dataset, userQuery } = state;
 
-  // const { dataset: evaluatedDataset } = await evalAgent.invoke({
-  //   dataset,
-  //   userQuery,
-  // });
+  const { dataset: evaluatedDataset } = await evalAgent.invoke({
+    dataset,
+    userQuery,
+  });
 
-  const evaluatedDataset = MOCK_EVALUATED_DATASETS.find(
-    d => d.id === dataset.id
-  )!;
+  // const evaluatedDataset = MOCK_EVALUATED_DATASETS.find(
+  //   d => d.id === dataset.id
+  // )!;
 
   // If the dataset is not relevant, don't add it to the state.
-  if (evaluatedDataset.evaluation?.relevant === false) {
+  if (evaluatedDataset.evaluation?.usable === false) {
     return {};
   }
 
@@ -93,14 +97,60 @@ async function evalNode(state: typeof EvalDatasetAnnotation.State) {
   };
 }
 
+const structuredModel = openai.withStructuredOutput(
+  z.object({
+    type: z.literal('dataset').or(z.literal('none')),
+    id: z.string().optional().nullable(),
+  })
+);
+
+async function datasetFinalSelectionNode(
+  state: typeof DataGovAnnotation.State
+) {
+  const { evaluatedDatasets, userQuery } = state;
+
+  const prompt = await DATA_GOV_FINAL_SELECTION_PROMPT.formatMessages({
+    datasets: JSON.stringify(evaluatedDatasets),
+    query: userQuery,
+  });
+
+  console.log('🔍 [FINAL SELECTION] Selecting final dataset...');
+
+  const result = await structuredModel.invoke(prompt);
+
+  if (result.type === 'none') {
+    console.log(
+      '🔍 [FINAL SELECTION] No dataset selected. Repeating process...'
+    );
+
+    // Clear the state so we can start over.
+    // TODO: Clear the state, but add the datasets we evaluated to a blacklist for next time.
+    return {};
+  }
+
+  return {
+    finalDataset: result,
+  };
+}
+
+async function shouldContinueWithSelection(
+  state: typeof DataGovAnnotation.State
+) {
+  const { finalDataset } = state;
+  // If no dataset is selected, we need to repeat the process.
+  return finalDataset ? END : 'search';
+}
+
 // Build the data-gov agent workflow
 const graph = new StateGraph(DataGovAnnotation)
   .addNode('search', searchNode)
   .addNode('eval', evalNode)
+  .addNode('select', datasetFinalSelectionNode)
 
   .addEdge(START, 'search')
   .addConditionalEdges('search', continueToEval)
-  .addEdge('eval', END)
+  .addEdge('eval', 'select')
+  .addConditionalEdges('select', shouldContinueWithSelection, ['search', END])
 
   .compile();
 

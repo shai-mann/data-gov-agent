@@ -26,7 +26,10 @@ v1.post('/data-gov/search', async c => {
 
     return c.json({
       success: true,
-      result: result.evaluatedDatasets,
+      result: result.evaluatedDatasets.find(
+        dataset => dataset.id === result.finalDataset?.id
+      ),
+      evaluatedDatasets: result.evaluatedDatasets,
       query: query,
     });
   } catch (error) {

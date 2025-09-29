@@ -23,7 +23,7 @@ export const selectDataset = tool(
       reason: z
         .string()
         .describe(
-          'Explanation of why this dataset is relevant to the user query'
+          "Explanation of why this dataset is usable to answer the user's query"
         ),
     }),
   }
