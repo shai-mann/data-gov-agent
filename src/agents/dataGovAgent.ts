@@ -9,7 +9,10 @@ import { DatasetSelection, DatasetWithEvaluation } from '../lib/annotation';
 import { Send } from '@langchain/langgraph';
 import searchAgent from './datasetSearchAgent';
 import evalAgent from './datasetEvalAgent';
-import { MOCK_DATASETS } from './helpers/mock-datasets';
+import {
+  MOCK_DATASETS,
+  MOCK_EVALUATED_DATASETS,
+} from './helpers/mock-datasets';
 
 /**
  * Main annotation for the data-gov agent.
@@ -70,10 +73,19 @@ function continueToEval(state: typeof DataGovAnnotation.State) {
 async function evalNode(state: typeof EvalDatasetAnnotation.State) {
   const { dataset, userQuery } = state;
 
-  const { dataset: evaluatedDataset } = await evalAgent.invoke({
-    dataset,
-    userQuery,
-  });
+  // const { dataset: evaluatedDataset } = await evalAgent.invoke({
+  //   dataset,
+  //   userQuery,
+  // });
+
+  const evaluatedDataset = MOCK_EVALUATED_DATASETS.find(
+    d => d.id === dataset.id
+  )!;
+
+  // If the dataset is not relevant, don't add it to the state.
+  if (evaluatedDataset.evaluation?.relevant === false) {
+    return {};
+  }
 
   return {
     // Uses state key for outer state, so it will automatically go there.
