@@ -39,3 +39,9 @@ export const DatasetWithEvaluationSchema = z.object({
     .optional()
     .nullable(),
 });
+
+export const QueryAgentSummarySchema = z.object({
+  queries: z.array(z.string()).describe('The SQL queries that were executed'),
+  results: z.string().describe('The results of the SQL query'),
+  summary: z.string().describe('A summary of the results of the SQL query'),
+});

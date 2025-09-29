@@ -24,13 +24,14 @@
   ],
   "author": "Shai Mann <shai-mann>",
   "dependencies": {
+    "@duckdb/node-api": "^1.4.0-r.1",
     "@langchain/core": "^0.3.77",
     "@langchain/langgraph": "^0.4.9",
     "@langchain/openai": "^0.6.13",
     "axios": "^1.12.2",
     "cheerio": "^1.1.2",
     "hono": "^4.0.0",
-    "langchain": "^1.0.0-alpha.5",
+    "langchain": "1.0.0-alpha.6",
     "nock": "^14.0.10"
   },
   "devDependencies": {
