@@ -5,44 +5,102 @@ import {
   START,
   StateGraph,
 } from '@langchain/langgraph';
-import { DatasetSelection } from '../lib/annotation';
-import datasetSearchAgent from './datasetSearchAgent';
+import { DatasetSelection, DatasetWithEvaluation } from '../lib/annotation';
+import { Send } from '@langchain/langgraph';
+import searchAgent from './datasetSearchAgent';
+import evalAgent from './datasetEvalAgent';
+import {
+  MOCK_DATASETS,
+  MOCK_EVALUATED_DATASETS,
+} from './helpers/mock-datasets';
 
-// State annotation for the dataset selection workflow
+/**
+ * Main annotation for the data-gov agent.
+ */
 const DataGovAnnotation = Annotation.Root({
   ...MessagesAnnotation.spec,
-  datasets: Annotation<DatasetSelection[]>({
+  datasets: Annotation<DatasetWithEvaluation[]>({
+    // NOT CONCATENATION, because we need to be able to override old datasets when the search returns new ones.
+    reducer: (_, val) => val,
+    default: () => [],
+  }),
+  evaluatedDatasets: Annotation<DatasetWithEvaluation[]>({
+    // YES CONCATENATION, because we need to accumulate the evaluated datasets from fan-in and fan-out.
     reducer: (cur, val) => cur.concat(val),
     default: () => [],
   }),
   userQuery: Annotation<string>(),
 });
 
-async function searchAgentNode(state: typeof DataGovAnnotation.State) {
+/**
+ * Simple annotation for a single dataset. Used in fan-out for evaluating datasets.
+ */
+const EvalDatasetAnnotation = Annotation.Root({
+  dataset: Annotation<DatasetSelection>(),
+  userQuery: Annotation<string>(),
+});
+
+async function searchNode(state: typeof DataGovAnnotation.State) {
   const { userQuery } = state;
 
-  console.log('🔍 Executing dataset searching agent with query:', userQuery);
+  // const { datasets } = await searchAgent.invoke(
+  //   {
+  //     userQuery,
+  //   },
+  //   {
+  //     // slightly above the default of 20, to allow more iteration as it finds datasets.
+  //     recursionLimit: 30,
+  //   }
+  // );
 
-  const result = await datasetSearchAgent.invoke(
-    {
-      userQuery,
-    },
-    {
-      recursionLimit: 30, // slightly above the default of 20, but enough to find all datasets.
-    }
-  );
+  const datasets = MOCK_DATASETS;
 
   return {
-    datasets: result.datasets,
+    userQuery,
+    datasets,
+  };
+}
+
+/**
+ * Conditional edge function to construct the fan-out for evaluating datasets.
+ */
+function continueToEval(state: typeof DataGovAnnotation.State) {
+  const { datasets, userQuery } = state;
+
+  return datasets.map(dataset => new Send('eval', { dataset, userQuery }));
+}
+
+async function evalNode(state: typeof EvalDatasetAnnotation.State) {
+  const { dataset, userQuery } = state;
+
+  // const { dataset: evaluatedDataset } = await evalAgent.invoke({
+  //   dataset,
+  //   userQuery,
+  // });
+
+  const evaluatedDataset = MOCK_EVALUATED_DATASETS.find(
+    d => d.id === dataset.id
+  )!;
+
+  // If the dataset is not relevant, don't add it to the state.
+  if (evaluatedDataset.evaluation?.relevant === false) {
+    return {};
+  }
+
+  return {
+    // Uses state key for outer state, so it will automatically go there.
+    evaluatedDatasets: evaluatedDataset,
   };
 }
 
 // Build the data-gov agent workflow
 const graph = new StateGraph(DataGovAnnotation)
-  .addNode('searchAgent', searchAgentNode)
+  .addNode('search', searchNode)
+  .addNode('eval', evalNode)
 
-  .addEdge(START, 'searchAgent')
-  .addEdge('searchAgent', END)
+  .addEdge(START, 'search')
+  .addConditionalEdges('search', continueToEval)
+  .addEdge('eval', END)
 
   .compile();
 

@@ -5,37 +5,40 @@ import {
   START,
   StateGraph,
 } from '@langchain/langgraph';
-import { DATA_GOV_EVALUATE_DATASET_PROMPT } from '../lib/prompts';
-import { DatasetEvaluation, DatasetSelection } from '../lib/annotation';
+import {
+  DATA_GOV_EVALUATE_DATASET_PROMPT,
+  DATA_GOV_EVALUATE_OUTPUT_PROMPT,
+  DATA_GOV_EVALUATE_REMINDER_PROMPT,
+} from '../lib/prompts';
+import {
+  DatasetWithEvaluation,
+  DatasetWithEvaluationSchema,
+} from '../lib/annotation';
 import { openai } from '../llms';
 import { datasetDownload, doiView, packageShow } from '../tools';
 import { ToolNode } from '@langchain/langgraph/prebuilt';
 import { AIMessage } from '@langchain/core/messages';
-import { WebBrowser } from 'langchain/tools/webbrowser';
-import { OpenAIEmbeddings } from '@langchain/openai';
-import { tool } from 'langchain';
-import { z } from 'zod';
 
 // State annotation for the dataset evaluation workflow
 const DatasetEvalAnnotation = Annotation.Root({
   ...MessagesAnnotation.spec,
-  dataset: Annotation<DatasetSelection>,
+  dataset: Annotation<DatasetWithEvaluation>,
   userQuery: Annotation<string>,
-  evaluation: Annotation<DatasetEvaluation>,
 });
 
 const tools = [packageShow, datasetDownload, doiView];
 
 const model = openai.bindTools(tools);
-const embeddings = new OpenAIEmbeddings();
-const webBrowser = new WebBrowser({ model: openai, embeddings });
+const structuredModel = openai.withStructuredOutput(
+  DatasetWithEvaluationSchema
+);
 
 /* DATASET EVALUATION WORKFLOW */
 
 async function setupNode(state: typeof DatasetEvalAnnotation.State) {
   const { dataset, userQuery } = state;
 
-  console.log('🔍 Setting up initial state...');
+  console.log('🔍 [EVAL] Initializing...');
 
   const prompt = await DATA_GOV_EVALUATE_DATASET_PROMPT.formatMessages({
     query: userQuery,
@@ -51,12 +54,36 @@ async function setupNode(state: typeof DatasetEvalAnnotation.State) {
 
 // Core evaluation prompt (evaluates a single dataset in the context of the user query)
 async function modelNode(state: typeof DatasetEvalAnnotation.State) {
-  console.log('🔍 Calling model...');
+  console.log('🔍 [EVAL] Evaluating...');
 
-  const result = await model.invoke([...state.messages]);
+  const reminderPrompt = await DATA_GOV_EVALUATE_REMINDER_PROMPT.formatMessages(
+    {}
+  );
+
+  const result = await model.invoke([...state.messages, ...reminderPrompt]);
 
   return {
     messages: result,
+  };
+}
+
+async function outputNode(state: typeof DatasetEvalAnnotation.State) {
+  console.log('🔍 [EVAL] Structuring output...');
+
+  const { messages, dataset } = state;
+  const lastMessage = messages.at(-1) as AIMessage;
+
+  const prompt = await DATA_GOV_EVALUATE_OUTPUT_PROMPT.formatMessages({
+    datasetId: dataset.id,
+    datasetTitle: dataset.title,
+    datasetReason: dataset.reason,
+    evaluation: lastMessage.content as string,
+  });
+
+  const evaluation = await structuredModel.invoke(prompt);
+
+  return {
+    dataset: evaluation,
   };
 }
 
@@ -72,35 +99,21 @@ function shouldContinue(state: typeof DatasetEvalAnnotation.State) {
     return 'toolNode';
   }
 
-  console.log('🔍 Exiting workflow');
-  return END;
+  console.log('🔍 [EVAL] Exiting workflow');
+  return 'output';
 }
-
-// TODO: temporary tool to have logging for when searching the web
-const webSearchTool = tool(
-  async ({ query }) => {
-    console.log('🔍 Searching the web for:', query);
-    const result = await webBrowser.invoke({ query });
-    return result;
-  },
-  {
-    name: 'webSearch',
-    description: 'Search the web for information about the dataset',
-    schema: z.object({
-      query: z.string().describe('The query to search the web for'),
-    }),
-  }
-);
 
 const graph = new StateGraph(DatasetEvalAnnotation)
   .addNode('setup', setupNode)
   .addNode('model', modelNode)
-  .addNode('toolNode', new ToolNode([...tools, webSearchTool]))
+  .addNode('toolNode', new ToolNode(tools))
+  .addNode('output', outputNode)
 
   .addEdge(START, 'setup')
   .addEdge('setup', 'model')
-  .addConditionalEdges('model', shouldContinue, ['toolNode', END])
+  .addConditionalEdges('model', shouldContinue, ['toolNode', 'output'])
   .addEdge('toolNode', 'model')
+  .addEdge('output', END)
   .compile();
 
 export default graph;

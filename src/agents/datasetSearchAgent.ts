@@ -62,6 +62,7 @@ async function modelNode(state: typeof DatasetSearchAnnotation.State) {
   const reminderPrompt = await DATA_GOV_REMINDER_PROMPT.formatMessages({
     query: state.userQuery,
     datasetCount: state.datasets.length,
+    datasetIds: state.datasets.map(d => d.id).join(', '),
   });
 
   const result = await model.invoke([...state.messages, ...reminderPrompt]);
@@ -92,7 +93,9 @@ async function processDatasetSelectionNode(
     .filter(m => isToolMessage(m))
     .filter(m => m.name === 'selectDataset')
     .filter(m => m.content && typeof m.content === 'string')
-    .map(m => JSON.parse(m.content as string));
+    .map(m => JSON.parse(m.content as string))
+    // Filter out any datasets that already exist in the state
+    .filter(m => !state.datasets.some(d => d.id === m.id));
 
   if (toolMessages.length === 0) {
     console.log('🔍 No selectDataset tool calls found');
@@ -132,6 +135,7 @@ function shouldContinueFromPostTools(
 ) {
   const { datasets } = state;
   if (datasets.length >= MAX_REQUESTED_DATASETS) {
+    console.log('🔍 Exiting search workflow - reached max requested datasets');
     return END;
   }
   return 'model';
