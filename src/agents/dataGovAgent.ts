@@ -172,10 +172,15 @@ async function queryNode(state: typeof DataGovAnnotation.State) {
     throw new Error('[CORE] No dataset selected at querying node');
   }
 
-  const { summary } = await queryAgent.invoke({
-    dataset: finalDataset,
-    userQuery,
-  });
+  const { summary } = await queryAgent.invoke(
+    {
+      dataset: finalDataset,
+      userQuery,
+    },
+    {
+      recursionLimit: 50, // This limit is high, but there's a lower limit in the query agent itself, to force it to exit.
+    }
+  );
 
   console.log('🔍 [CORE] Exiting workflow');
   return {
@@ -203,10 +208,7 @@ const graph = new StateGraph(DataGovAnnotation)
   .addEdge('format', 'search')
   .addConditionalEdges('search', continueToEval)
   .addEdge('eval', 'select')
-  .addConditionalEdges('select', shouldContinueWithSelection, [
-    'search',
-    'query',
-  ])
+  .addConditionalEdges('select', shouldContinueWithSelection, [END, 'query'])
   .addEdge('query', END)
 
   .compile();

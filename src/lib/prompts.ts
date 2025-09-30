@@ -336,7 +336,14 @@ export const QUERY_AGENT_EVALUATE_QUERY_PROMPT =
 - {preview}: A small preview of the dataset (first N rows).
 - {remainingQueryCount}: How many queries can still be executed before running out of tries.
 
+**CRITICAL NOTE:** The dataset is ALWAYS correct, and ALWAYS contains a viable answer to the user's question. If the history makes it seem like the dataset is incomplete or there are no tables, examine what issues with the previous query might be causing it, because the data is there and complete.
+
 ### Instructions:
+0. **Evaluate for dumb mistakes**:
+   - Is the query syntactically correct? Are there any obvious syntax errors?
+   - Is the query using the correct table name?
+   - Is the query using the correct columns?
+
 1. **Evaluate completeness and accuracy**:
    - Consider whether a query generated from this context can fully answer {userQuery}.
    - Ensure derived metrics (totals, percentages, ratios) can be calculated correctly.
@@ -363,7 +370,6 @@ Return a structured response as JSON:
   "final_query_ready": "true|false",
   "issues_detected": ["list of potential problems or anomalies"],
   "suggested_next_steps": ["instructions for the next query, if needed"],
-  "assumptions": ["any assumptions based on the preview or dataset context"]
 }}
 `,
     },

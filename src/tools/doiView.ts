@@ -76,7 +76,7 @@ function parseWorksheet(worksheet: ExcelJS.Worksheet) {
   return lines.join('\n');
 }
 
-const IGNORED_LINK_TYPES = ['.jpeg', '.jpg', '.png', '.gif', '.docx'];
+const IGNORED_LINK_TYPES = ['.jpeg', '.jpg', '.png', '.gif', '.docx', '.csv'];
 
 /**
  * View DOI (Digital Object Identifier) information for a dataset
@@ -89,7 +89,7 @@ export const doiView = tool(
     if (IGNORED_LINK_TYPES.some(type => doi.includes(type))) {
       return {
         success: false,
-        error: 'This link is not a dataset.',
+        error: 'This link is not a valid non-dataset resource link.',
         doi_info: null,
       };
     }
