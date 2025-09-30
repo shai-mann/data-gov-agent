@@ -172,7 +172,7 @@ async function queryNode(state: typeof DataGovAnnotation.State) {
     throw new Error('[CORE] No dataset selected at querying node');
   }
 
-  const summary = await queryAgent.invoke({
+  const { summary } = await queryAgent.invoke({
     dataset: finalDataset,
     userQuery,
   });
