@@ -139,15 +139,28 @@ async function datasetFinalSelectionNode(
 
   const result = await structuredModel.invoke(prompt);
 
-  if (result.type === 'none') {
+  if (result.type === 'none' || !result.id) {
     console.log('🔍 [CORE] No dataset selected. Repeating process...');
 
     // Exit early.
     return {};
   }
 
+  const evaluatedDataset = evaluatedDatasets.find(d => d.id === result.id);
+
+  if (!evaluatedDataset) {
+    console.log(
+      '🔍 [CORE] No dataset found in evaluated datasets. Repeating process...'
+    );
+
+    // Exit early.
+    return {};
+  }
+
+  console.log('🔍 [CORE] Final dataset selected: ', evaluatedDataset);
+
   return {
-    finalDataset: result,
+    finalDataset: evaluatedDataset,
   };
 }
 

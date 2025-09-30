@@ -18,8 +18,8 @@ import { getLastAiMessageIndex, getToolMessages } from '../lib/utils';
 import { z } from 'zod';
 import shallowEvalAgent from './shallowEvalAgent';
 
-// It can return with fewer than this (it's asked for 10-15), but this is a backstop to prevent recursion caps from being hit.
-const MAX_REQUESTED_DATASETS = 20;
+// It can return with fewer than this (it's asked for 5-10), but this is a backstop to prevent recursion caps from being hit.
+const MAX_REQUESTED_DATASETS = 15;
 
 // State annotation for the dataset selection workflow
 const DatasetSearchAnnotation = Annotation.Root({

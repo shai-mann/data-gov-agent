@@ -80,10 +80,31 @@ async function outputNode(state: typeof DatasetEvalAnnotation.State) {
     evaluation: lastMessage.content as string,
   });
 
-  const evaluation = await structuredModel.invoke(prompt);
+  const response = await structuredModel.invoke(prompt);
+
+  if (!response.evaluation?.usable) {
+    return {
+      dataset: response,
+    };
+  }
+
+  let cleanedBestResource = response.evaluation?.bestResource;
+
+  // Check and see if it was returned in MD format: [Title](link)
+  if (cleanedBestResource.includes('(')) {
+    cleanedBestResource = cleanedBestResource.split('(')[1];
+  }
+
+  const massagedEvaluation = {
+    ...response,
+    evaluation: {
+      ...response.evaluation,
+      bestResource: cleanedBestResource,
+    },
+  };
 
   return {
-    dataset: evaluation,
+    dataset: massagedEvaluation,
   };
 }
 

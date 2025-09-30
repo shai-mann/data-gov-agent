@@ -73,7 +73,7 @@ Guidelines:
 export const DATA_GOV_REMINDER_PROMPT = ChatPromptTemplate.fromMessages([
   {
     role: 'system',
-    content: `REMINDER: The user's query is: "{query}". Find 10-15 UNIQUE datasets that are relevant to the user's question. You currently have {datasetCount} datasets selected.
+    content: `REMINDER: The user's query is: "{query}". Find 5-10 UNIQUE datasets that are relevant to the user's question. You currently have {datasetCount} datasets selected.
 
     The datasets you have selected so far are: {datasetIds}.
 
@@ -211,6 +211,9 @@ export const DATA_GOV_EVALUATE_OUTPUT_PROMPT = ChatPromptTemplate.fromMessages([
     The dataset to evaluate has ID: {datasetId}, Title: {datasetTitle}, and was suggested because: {datasetReason}.
 
     Make sure to include the ENTIRE evaluation in the output, including the reasoning, scoring, and best resource. Changing text at all will result in a failure.
+
+    ### CRITICAL:
+    - If the 'bestResource' contains any text other than the original link, it is unusable. It MUST start with http:// or https://.
     `,
   },
   {
