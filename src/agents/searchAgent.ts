@@ -37,6 +37,8 @@ const DatasetSearchAnnotation = Annotation.Root({
  */
 const EvalDatasetAnnotation = Annotation.Root({
   datasetId: Annotation<string>(),
+  userQuery: Annotation<string>(),
+  datasets: Annotation<DatasetSelection[]>(),
 });
 
 const tools = [packageSearch, packageNameSearch];
@@ -62,8 +64,15 @@ async function setupNode(state: typeof DatasetSearchAnnotation.State) {
 }
 
 async function modelNode(state: typeof DatasetSearchAnnotation.State) {
+  if (state.datasets.length >= MAX_REQUESTED_DATASETS) {
+    console.log(
+      '🔍 [SEARCH] Exiting search workflow (model) - reached max requested datasets'
+    );
+    return {}; // Skip this model call, so the workflow will exit.
+  }
+
   console.log(
-    '🔍 Calling model... currently has',
+    '🔍 [SEARCH] Calling model... currently has',
     state.datasets.length,
     'dataset selections'
   );
@@ -83,7 +92,7 @@ async function modelNode(state: typeof DatasetSearchAnnotation.State) {
 
 // Middle node to process calls from tools and perform additional post-processing
 async function postToolsNode(state: typeof DatasetSearchAnnotation.State) {
-  console.log('⚖️ Tool post-processing Node - Processing tool results...');
+  console.log('⚖️ [SEARCH] Tool post-processing Node');
   const { messages } = state;
 
   // Since it could be a batch of tool calls, we need to find all tool calls since the last AI message
@@ -106,7 +115,12 @@ async function postToolsNode(state: typeof DatasetSearchAnnotation.State) {
 }
 
 async function shallowEvalNode(state: typeof EvalDatasetAnnotation.State) {
-  const { datasetId } = state;
+  const { datasetId, userQuery, datasets } = state;
+
+  // Skip if the dataset is already in the state.
+  if (datasets.some(d => d.id === datasetId)) {
+    return {};
+  }
 
   const dataset = await packageShow.invoke({
     packageId: datasetId,
@@ -114,15 +128,22 @@ async function shallowEvalNode(state: typeof EvalDatasetAnnotation.State) {
 
   const { evaluation } = await shallowEvalAgent.invoke({
     dataset,
+    userQuery,
   });
 
   // If the dataset is not compatible, don't add it to the state.
-  if (!evaluation.isCompatible) {
+  if (!evaluation || !evaluation.isCompatible) {
     return {};
   }
 
+  const datasetSelection: DatasetSelection = {
+    id: datasetId,
+    title: dataset.title,
+    reason: evaluation.reasoning,
+  };
+
   // Uses state key for outer state, so it will automatically go there.
-  return { datasets: dataset };
+  return { datasets: datasetSelection };
 }
 
 function shouldContinueToTools(state: typeof DatasetSearchAnnotation.State) {
@@ -139,13 +160,14 @@ function shouldContinueToTools(state: typeof DatasetSearchAnnotation.State) {
   }
 
   // If no tools were called, the AI is presumed to have found all the datasets it needed to find
-  console.log('🔍 Exiting search workflow');
+  console.log('🔍 [SEARCH] Exiting search workflow');
   return END;
 }
 
 // Conditional edge to route from post-tools node either to the model or to the end, depending on whether the AI has found enough datasets
 function shouldContinueToModel(state: typeof DatasetSearchAnnotation.State) {
   const { datasets } = state;
+
   if (datasets.length >= MAX_REQUESTED_DATASETS) {
     console.log('🔍 Exiting search workflow - reached max requested datasets');
     return END;
@@ -155,20 +177,26 @@ function shouldContinueToModel(state: typeof DatasetSearchAnnotation.State) {
 }
 
 function shouldContinueToEval(state: typeof DatasetSearchAnnotation.State) {
-  const { pendingDatasets } = state;
+  const { pendingDatasets, userQuery, datasets } = state;
   if (pendingDatasets.length === 0) {
-    console.log('🔍 No pending datasets, skipping shallowEval');
+    console.log('🔍 [SEARCH] No pending datasets, skipping shallowEval');
     return 'model';
   }
 
-  console.log('🔍 Shallow evaluating', pendingDatasets.length, 'datasets');
-  return pendingDatasets.map(id => new Send('shallowEval', { datasetId: id }));
+  console.log(
+    '🔍 [SEARCH] Shallow evaluating',
+    pendingDatasets.length,
+    'datasets'
+  );
+  return pendingDatasets.map(
+    id => new Send('shallowEval', { datasetId: id, userQuery, datasets })
+  );
 }
 
 // Build the data-gov agent workflow
 const graph = new StateGraph(DatasetSearchAnnotation)
   .addNode('setup', setupNode)
-  .addNode('model', modelNode)
+  .addNode('model', modelNode, { defer: true })
   .addNode('tools', new ToolNode(tools))
   .addNode('postTools', postToolsNode)
   .addNode('shallowEval', shallowEvalNode)

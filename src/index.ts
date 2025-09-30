@@ -83,7 +83,7 @@ v1.post('/test/dataset-search', async c => {
 
 v1.post('/test/shallow-eval', async c => {
   try {
-    const { datasetId } = await c.req.json();
+    const { datasetId, query } = await c.req.json();
 
     const dataset = await packageShow.invoke({
       packageId: datasetId,
@@ -91,11 +91,13 @@ v1.post('/test/shallow-eval', async c => {
 
     const result = await shallowEvalAgent.invoke({
       dataset,
+      userQuery: query,
     });
 
     return c.json({
       success: true,
-      result,
+      result: result.evaluation,
+      resourceEvaluations: result.resourceEvaluations,
     });
   } catch (error) {
     console.error('Shallow eval error:', error);

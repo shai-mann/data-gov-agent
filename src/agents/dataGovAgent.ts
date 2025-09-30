@@ -177,7 +177,7 @@ const graph = new StateGraph(DataGovAnnotation)
   .addNode('format', userQueryFormattingNode)
   .addNode('search', searchNode)
   .addNode('eval', evalNode)
-  .addNode('select', datasetFinalSelectionNode)
+  .addNode('select', datasetFinalSelectionNode, { defer: true })
   .addNode('query', queryNode)
 
   .addEdge(START, 'format')

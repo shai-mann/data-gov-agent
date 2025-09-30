@@ -5,6 +5,7 @@ import {
   Annotation,
   END,
   MessagesAnnotation,
+  Send,
   START,
   StateGraph,
 } from '@langchain/langgraph';
@@ -12,54 +13,101 @@ import { openai } from '../llms';
 import { ShallowEvaluationSchema } from '../lib/annotation';
 import { z } from 'zod';
 import { PackageShowResponse } from '../lib/data-gov.schemas';
+import {
+  DATA_GOV_SHALLOW_EVAL_SINGLE_RESOURCE_PROMPT,
+  DATA_GOV_SHALLOW_EVAL_SUMMATIVE_PROMPT,
+} from '../lib/prompts';
 
 const ShallowSearchAnnotation = Annotation.Root({
   ...MessagesAnnotation.spec,
   dataset: Annotation<PackageShowResponse>,
+  resourceEvaluations: Annotation<z.infer<typeof ShallowEvaluationSchema>[]>({
+    reducer: (cur, val) => cur.concat(val),
+    default: () => [],
+  }),
   userQuery: Annotation<string>(),
   evaluation: Annotation<z.infer<typeof ShallowEvaluationSchema>>,
 });
 
+const ResourceEvaluationAnnotation = Annotation.Root({
+  resource: Annotation<PackageShowResponse['resources'][number]>,
+  userQuery: Annotation<string>(),
+});
+
 // Structured model to evaluate a single resource in the dataset
-const structuredModel = openai.withStructuredOutput(
-  z.object({
-    mimeType: z.string().describe('The MIME type of the resource'),
-    isCompatible: z
-      .boolean()
-      .describe(
-        'Whether the resource is compatible with the dataset tools we have access to'
-      ),
-    link: z
-      .string()
-      .describe(
-        'The link to the resource, PRECISELY as it appears in the dataset'
-      )
-      .optional()
-      .nullable(),
-    reasoning: z.string(),
-  })
+const structuredModel = openai.withStructuredOutput(ShallowEvaluationSchema);
+
+const structuredSummativeModel = openai.withStructuredOutput(
+  ShallowEvaluationSchema
 );
 
-async function setupNode(state: typeof ShallowSearchAnnotation.State) {
-  return {
-    evaluation: {
-      isCompatible: true,
-      link: 'https://data.gov/dataset/1234567890',
-      reasoning: 'All resources are compatible',
-      mimeType: 'text/csv',
-    },
-  };
+async function setupNode() {
+  // We only need a node here so we can fan-out in the edge.
+  return {};
 }
 
-async function evaluateResourcesNode(
+/**
+ * Evaluates a single resource in the dataset, extracting metadata and determining if it's compatible with the tools we have access to.
+ */
+async function evaluateResourceNode(
+  state: typeof ResourceEvaluationAnnotation.State
+) {
+  const { resource, userQuery } = state;
+
+  console.log('🔍 [SHALLOW EVAL] Evaluating resource...', resource.name);
+
+  const prompt =
+    await DATA_GOV_SHALLOW_EVAL_SINGLE_RESOURCE_PROMPT.formatMessages({
+      resource: JSON.stringify(resource),
+      userQuery,
+    });
+
+  const evaluation = await structuredModel.invoke(prompt);
+
+  // Use the key of the outer graph to add to the core state.
+  return { resourceEvaluations: evaluation };
+}
+
+async function summativeEvaluationNode(
   state: typeof ShallowSearchAnnotation.State
-) {}
+) {
+  const { resourceEvaluations, userQuery } = state;
+
+  const prompt = await DATA_GOV_SHALLOW_EVAL_SUMMATIVE_PROMPT.formatMessages({
+    resourceEvaluations: JSON.stringify(resourceEvaluations),
+    userQuery,
+  });
+
+  const evaluation = await structuredSummativeModel.invoke(prompt);
+
+  console.log('🔍 [SHALLOW EVAL] Exiting workflow');
+  return { evaluation };
+}
+
+async function fanOutEdge(state: typeof ShallowSearchAnnotation.State) {
+  const {
+    dataset: { resources },
+  } = state;
+
+  if (!resources) {
+    console.log('🔍 [SHALLOW EVAL] No resources found - exiting workflow');
+    return END;
+  }
+
+  return resources.map(
+    resource => new Send('eval', { resource, userQuery: state.userQuery })
+  );
+}
 
 const graph = new StateGraph(ShallowSearchAnnotation)
   .addNode('setup', setupNode)
+  .addNode('eval', evaluateResourceNode)
+  .addNode('summary', summativeEvaluationNode)
 
   .addEdge(START, 'setup')
-  .addEdge('setup', END)
+  .addConditionalEdges('setup', fanOutEdge, ['eval', END])
+  .addEdge('eval', 'summary')
+  .addEdge('summary', END)
 
   .compile();
 

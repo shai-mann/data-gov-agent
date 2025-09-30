@@ -47,8 +47,16 @@ export const QueryAgentSummarySchema = z.object({
 });
 
 export const ShallowEvaluationSchema = z.object({
-  mimeType: z.string(),
-  isCompatible: z.boolean(),
-  link: z.string(),
-  reasoning: z.string(),
+  mimeType: z.string().describe('The MIME type of the resource'),
+  isCompatible: z
+    .boolean()
+    .describe(
+      'Whether the resource is compatible with the dataset tools we have access to'
+    ),
+  link: z
+    .string()
+    .describe(
+      'The link to the resource, PRECISELY as it appears in the dataset. If the resource is compatible, must be provided.'
+    ),
+  reasoning: z.string().describe('The reasoning for the evaluation'),
 });
