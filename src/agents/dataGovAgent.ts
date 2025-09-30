@@ -16,10 +16,12 @@ import evalAgent from './evalAgent';
 import { openai } from '../llms';
 import { z } from 'zod';
 import {
+  DATA_GOV_FINAL_EVALUATION_PROMPT,
   DATA_GOV_FINAL_SELECTION_PROMPT,
   DATA_GOV_USER_QUERY_FORMATTING_PROMPT,
 } from '../lib/prompts';
 import queryAgent from './queryAgent';
+import { getPackage } from '../lib/data-gov';
 
 /**
  * Main annotation for the data-gov agent.
@@ -37,6 +39,7 @@ const DataGovAnnotation = Annotation.Root({
   finalDataset: Annotation<DatasetWithEvaluation | null>(),
   userQuery: Annotation<string>(),
   summary: Annotation<z.infer<typeof QueryAgentSummarySchema>>(),
+  output: Annotation<string>(),
 });
 
 /**
@@ -188,6 +191,29 @@ async function queryNode(state: typeof DataGovAnnotation.State) {
   };
 }
 
+async function emitFinalEvaluationNode(state: typeof DataGovAnnotation.State) {
+  const { summary, finalDataset, userQuery } = state;
+
+  if (!finalDataset) {
+    throw new Error('No final dataset selected');
+  }
+
+  const fullPackage = await getPackage(finalDataset.id);
+
+  const prompt = await DATA_GOV_FINAL_EVALUATION_PROMPT.formatMessages({
+    userQuery,
+    summary: JSON.stringify(summary),
+    finalDataset: JSON.stringify(finalDataset),
+    fullPackage: JSON.stringify(fullPackage),
+  });
+
+  const response = await openai.invoke(prompt);
+
+  return {
+    output: response.content,
+  };
+}
+
 async function shouldContinueWithSelection(
   state: typeof DataGovAnnotation.State
 ) {
@@ -203,13 +229,15 @@ const graph = new StateGraph(DataGovAnnotation)
   .addNode('eval', evalNode)
   .addNode('select', datasetFinalSelectionNode, { defer: true })
   .addNode('query', queryNode)
+  .addNode('emitOutput', emitFinalEvaluationNode)
 
   .addEdge(START, 'format')
   .addEdge('format', 'search')
   .addConditionalEdges('search', continueToEval)
   .addEdge('eval', 'select')
   .addConditionalEdges('select', shouldContinueWithSelection, [END, 'query'])
-  .addEdge('query', END)
+  .addEdge('query', 'emitOutput')
+  .addEdge('emitOutput', END)
 
   .compile();
 

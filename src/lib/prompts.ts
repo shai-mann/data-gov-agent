@@ -437,3 +437,35 @@ Produce a clear, natural-language description of the dataset. Your output should
     ----`,
   },
 ]);
+
+export const DATA_GOV_FINAL_EVALUATION_PROMPT = ChatPromptTemplate.fromMessages(
+  [
+    {
+      role: 'system',
+      content: `You are a data.gov assistant. You are given a summary of a dataset, a final dataset, and the full package metadata. Examine the summary and final dataset, and write a final response to the user's question.
+
+      It's TOTALLY OKAY to say "we couldn't provide an exact answer, but here's how far we got." In those cases, say that in the summary.
+
+      ### The User's Original Question
+      User's Question: {userQuery}
+
+      ### The Summary
+
+      The summary is: {summary}
+
+      ### The Final Dataset
+      The final dataset is: {finalDataset}
+
+      ### The Full Package Metadata
+      The full package metadata is: {fullPackage}
+
+      ### Output Format
+      - **Summary**: A clear, concise summary of the resulting data. Include exact numbers and percentages where applicable. Structure it as an answer to the user's question.
+      - **Table**: The resulting table of data. Leave this in as raw a format as possible.
+      - **Queries**: The SQL queries that were executed.
+      - **Dataset**: The dataset that was used to answer the question, including the ID, title, and download link. THE DOWNLOAD LINK MUST BE EXACTLY THE SAME AS THE ONE IN THE FINAL DATASET.
+      - **Useful links**: Any and all useful links you see in the full package metadata, along with a brief title-style description for them.
+    `,
+    },
+  ]
+);
