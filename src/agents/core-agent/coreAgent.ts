@@ -9,24 +9,31 @@ import {
   DatasetSelection,
   DatasetWithEvaluation,
   QueryAgentSummarySchema,
-} from '../lib/annotation';
+} from '../../lib/annotation';
 import { Send } from '@langchain/langgraph';
-import searchAgent from './searchAgent';
-import evalAgent from './evalAgent';
-import { openai } from '../llms';
+import searchAgent from '../searchAgent';
+import evalAgent from '../evalAgent';
+import { openai } from '../../llms';
 import { z } from 'zod';
 import {
   DATA_GOV_FINAL_EVALUATION_PROMPT,
   DATA_GOV_FINAL_SELECTION_PROMPT,
   DATA_GOV_USER_QUERY_FORMATTING_PROMPT,
-} from '../lib/prompts';
-import queryAgent from './queryAgent';
-import { getPackage } from '../lib/data-gov';
+} from '../../lib/prompts';
+import queryAgent from '../queryAgent';
+import { getPackage } from '../../lib/data-gov';
+
+/*
+NOTE: This **was** a core agent (running exactly as you see below), but due to token limitations (20k tokens/min for my account),
+I'm submitting the separate agents for search, eval, and query, rather than this full combined agent.
+
+This code still exists so you can see how it would all get stitched together, but the project itself lives in the other agent files.
+*/
 
 /**
  * Main annotation for the data-gov agent.
  */
-const DataGovAnnotation = Annotation.Root({
+const GovResearcherAnnotation = Annotation.Root({
   ...MessagesAnnotation.spec,
   datasets: Annotation<DatasetSelection[]>({
     reducer: (cur, val) => cur.concat(val),
@@ -56,7 +63,9 @@ const formattingStructuredModel = openai.withStructuredOutput(
   })
 );
 
-async function userQueryFormattingNode(state: typeof DataGovAnnotation.State) {
+async function userQueryFormattingNode(
+  state: typeof GovResearcherAnnotation.State
+) {
   const { userQuery } = state;
   const prompt = await DATA_GOV_USER_QUERY_FORMATTING_PROMPT.formatMessages({
     query: userQuery,
@@ -71,7 +80,7 @@ async function userQueryFormattingNode(state: typeof DataGovAnnotation.State) {
   return { userQuery: result.query };
 }
 
-async function searchNode(state: typeof DataGovAnnotation.State) {
+async function searchNode(state: typeof GovResearcherAnnotation.State) {
   const { userQuery } = state;
 
   const { datasets } = await searchAgent.invoke(
@@ -93,7 +102,7 @@ async function searchNode(state: typeof DataGovAnnotation.State) {
 /**
  * Conditional edge function to construct the fan-out for evaluating datasets.
  */
-function continueToEval(state: typeof DataGovAnnotation.State) {
+function continueToEval(state: typeof GovResearcherAnnotation.State) {
   const { datasets, userQuery } = state;
 
   console.log(
@@ -131,7 +140,7 @@ const structuredModel = openai.withStructuredOutput(
 );
 
 async function datasetFinalSelectionNode(
-  state: typeof DataGovAnnotation.State
+  state: typeof GovResearcherAnnotation.State
 ) {
   const { evaluatedDatasets, userQuery } = state;
 
@@ -169,7 +178,7 @@ async function datasetFinalSelectionNode(
   };
 }
 
-async function queryNode(state: typeof DataGovAnnotation.State) {
+async function queryNode(state: typeof GovResearcherAnnotation.State) {
   const { finalDataset, userQuery } = state;
 
   if (!finalDataset) {
@@ -193,7 +202,9 @@ async function queryNode(state: typeof DataGovAnnotation.State) {
   };
 }
 
-async function emitFinalEvaluationNode(state: typeof DataGovAnnotation.State) {
+async function emitFinalEvaluationNode(
+  state: typeof GovResearcherAnnotation.State
+) {
   const { summary, finalDataset, userQuery } = state;
 
   if (!finalDataset) {
@@ -217,7 +228,7 @@ async function emitFinalEvaluationNode(state: typeof DataGovAnnotation.State) {
 }
 
 async function shouldContinueWithSelection(
-  state: typeof DataGovAnnotation.State
+  state: typeof GovResearcherAnnotation.State
 ) {
   const { finalDataset } = state;
   // If no dataset is selected, we end early.
@@ -225,7 +236,7 @@ async function shouldContinueWithSelection(
 }
 
 // Build the data-gov agent workflow
-const graph = new StateGraph(DataGovAnnotation)
+const graph = new StateGraph(GovResearcherAnnotation)
   .addNode('format', userQueryFormattingNode)
   .addNode('search', searchNode)
   .addNode('eval', evalNode)
