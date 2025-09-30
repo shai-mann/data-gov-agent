@@ -31,7 +31,7 @@ This code still exists so you can see how it would all get stitched together, bu
 */
 
 /**
- * Main annotation for the data-gov agent.
+ * Main annotation for the gov researcher agent.
  */
 const GovResearcherAnnotation = Annotation.Root({
   ...MessagesAnnotation.spec,
@@ -235,7 +235,7 @@ async function shouldContinueWithSelection(
   return finalDataset ? 'query' : END;
 }
 
-// Build the data-gov agent workflow
+// Build the gov researcher agent workflow
 const graph = new StateGraph(GovResearcherAnnotation)
   .addNode('format', userQueryFormattingNode)
   .addNode('search', searchNode)
