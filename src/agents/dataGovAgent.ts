@@ -11,14 +11,8 @@ import {
   QueryAgentSummarySchema,
 } from '../lib/annotation';
 import { Send } from '@langchain/langgraph';
-import searchAgent from './datasetSearchAgent';
-import evalAgent from './datasetEvalAgent';
-import {
-  MOCK_DATASETS,
-  MOCK_EVALUATED_DATASETS,
-  MOCK_FINAL_SELECTION,
-  MOCK_USER_QUERY,
-} from './helpers/mock-datasets';
+import searchAgent from './searchAgent';
+import evalAgent from './evalAgent';
 import { openai } from '../llms';
 import { z } from 'zod';
 import {
@@ -32,13 +26,11 @@ import queryAgent from './queryAgent';
  */
 const DataGovAnnotation = Annotation.Root({
   ...MessagesAnnotation.spec,
-  datasets: Annotation<DatasetWithEvaluation[]>({
-    // NOT CONCATENATION, because we need to be able to override old datasets when the search returns new ones.
-    reducer: (_, val) => val,
+  datasets: Annotation<DatasetSelection[]>({
+    reducer: (cur, val) => cur.concat(val),
     default: () => [],
   }),
   evaluatedDatasets: Annotation<DatasetWithEvaluation[]>({
-    // YES CONCATENATION, because we need to accumulate the evaluated datasets from fan-in and fan-out.
     reducer: (cur, val) => cur.concat(val),
     default: () => [],
   }),
@@ -71,8 +63,6 @@ async function userQueryFormattingNode(state: typeof DataGovAnnotation.State) {
 
   const result = await formattingStructuredModel.invoke(prompt);
 
-  // const result = MOCK_USER_QUERY;
-
   return { userQuery: result.query };
 }
 
@@ -89,8 +79,6 @@ async function searchNode(state: typeof DataGovAnnotation.State) {
     }
   );
 
-  // const datasets = MOCK_DATASETS;
-
   return {
     userQuery,
     datasets,
@@ -103,6 +91,11 @@ async function searchNode(state: typeof DataGovAnnotation.State) {
 function continueToEval(state: typeof DataGovAnnotation.State) {
   const { datasets, userQuery } = state;
 
+  console.log(
+    '🔍 [CORE] Kicking off evaluation for',
+    datasets.length,
+    'datasets'
+  );
   return datasets.map(dataset => new Send('eval', { dataset, userQuery }));
 }
 
@@ -114,11 +107,7 @@ async function evalNode(state: typeof EvalDatasetAnnotation.State) {
     userQuery,
   });
 
-  // const evaluatedDataset = MOCK_EVALUATED_DATASETS.find(
-  //   d => d.id === dataset.id
-  // )!;
-
-  // If the dataset is not relevant, don't add it to the state.
+  // If the dataset is not usable, don't add it to the state.
   if (evaluatedDataset.evaluation?.usable === false) {
     return {};
   }
@@ -149,18 +138,29 @@ async function datasetFinalSelectionNode(
   console.log('🔍 [CORE] Selecting final dataset...');
 
   const result = await structuredModel.invoke(prompt);
-  // const result = MOCK_FINAL_SELECTION;
 
-  if (result.type === 'none') {
+  if (result.type === 'none' || !result.id) {
     console.log('🔍 [CORE] No dataset selected. Repeating process...');
 
-    // Clear the state so we can start over.
-    // TODO: Clear the state, but add the datasets we evaluated to a blacklist for next time.
+    // Exit early.
     return {};
   }
 
+  const evaluatedDataset = evaluatedDatasets.find(d => d.id === result.id);
+
+  if (!evaluatedDataset) {
+    console.log(
+      '🔍 [CORE] No dataset found in evaluated datasets. Repeating process...'
+    );
+
+    // Exit early.
+    return {};
+  }
+
+  console.log('🔍 [CORE] Final dataset selected: ', evaluatedDataset);
+
   return {
-    finalDataset: result,
+    finalDataset: evaluatedDataset,
   };
 }
 
@@ -172,11 +172,12 @@ async function queryNode(state: typeof DataGovAnnotation.State) {
     throw new Error('[CORE] No dataset selected at querying node');
   }
 
-  const summary = await queryAgent.invoke({
+  const { summary } = await queryAgent.invoke({
     dataset: finalDataset,
     userQuery,
   });
 
+  console.log('🔍 [CORE] Exiting workflow');
   return {
     summary,
   };
@@ -186,9 +187,8 @@ async function shouldContinueWithSelection(
   state: typeof DataGovAnnotation.State
 ) {
   const { finalDataset } = state;
-  // If no dataset is selected, we need to repeat the process.
-  // Otherwise, move on to querying the dataset.
-  return finalDataset ? 'query' : 'search';
+  // If no dataset is selected, we end early.
+  return finalDataset ? 'query' : END;
 }
 
 // Build the data-gov agent workflow
@@ -196,7 +196,7 @@ const graph = new StateGraph(DataGovAnnotation)
   .addNode('format', userQueryFormattingNode)
   .addNode('search', searchNode)
   .addNode('eval', evalNode)
-  .addNode('select', datasetFinalSelectionNode)
+  .addNode('select', datasetFinalSelectionNode, { defer: true })
   .addNode('query', queryNode)
 
   .addEdge(START, 'format')

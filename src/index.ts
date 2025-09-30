@@ -1,6 +1,9 @@
 import { Hono } from 'hono';
 import dataGovAgent from './agents/dataGovAgent';
 import queryAgent from './agents/queryAgent';
+import datasetSearchAgent from './agents/searchAgent';
+import shallowEvalAgent from './agents/shallowEvalAgent';
+import { packageShow } from './tools';
 
 const app = new Hono();
 
@@ -27,12 +30,7 @@ v1.post('/data-gov/search', async c => {
 
     return c.json({
       success: true,
-      result: result.evaluatedDatasets.find(
-        dataset => dataset.id === result.finalDataset?.id
-      ),
-      evaluatedDatasets: result.evaluatedDatasets,
-      datasets: result.datasets,
-      query: result.userQuery,
+      ...result,
     });
   } catch (error) {
     console.error('Data Gov Agent error:', error);
@@ -47,7 +45,69 @@ v1.post('/data-gov/search', async c => {
   }
 });
 
-v1.post('/query', async c => {
+v1.post('/test/dataset-search', async c => {
+  try {
+    const { query } = await c.req.json();
+
+    if (!query) {
+      return c.json({ error: 'Query parameter is required' }, 400);
+    }
+
+    const result = await datasetSearchAgent.invoke({
+      userQuery: query,
+    });
+
+    return c.json({
+      success: true,
+      result: result.datasets,
+      userQuery: result.userQuery,
+      messages: result.messages,
+    });
+  } catch (error) {
+    console.error('Search Agent error:', error);
+    return c.json(
+      {
+        success: false,
+        error:
+          error instanceof Error ? error.message : 'Unknown error occurred',
+      },
+      500
+    );
+  }
+});
+
+v1.post('/test/shallow-eval', async c => {
+  try {
+    const { datasetId, query } = await c.req.json();
+
+    const dataset = await packageShow.invoke({
+      packageId: datasetId,
+    });
+
+    const result = await shallowEvalAgent.invoke({
+      dataset,
+      userQuery: query,
+    });
+
+    return c.json({
+      success: true,
+      result: result.evaluation,
+      resourceEvaluations: result.resourceEvaluations,
+    });
+  } catch (error) {
+    console.error('Shallow eval error:', error);
+    return c.json(
+      {
+        success: false,
+        error:
+          error instanceof Error ? error.message : 'Unknown error occurred',
+      },
+      500
+    );
+  }
+});
+
+v1.post('/test/query', async c => {
   try {
     const { query, dataset } = await c.req.json();
 
