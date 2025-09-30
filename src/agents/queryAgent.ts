@@ -31,7 +31,6 @@ import fs from 'fs';
 import os from 'os';
 import contextAgent from './contextAgent';
 import { getLastAiMessageIndex, getToolMessages } from '../lib/utils';
-import { MOCK_CONTEXT_SUMMARY } from './helpers/mock-datasets';
 
 // Create a persistent DuckDB connection in memory
 const instance = await DuckDBInstance.create(':memory:');
@@ -172,11 +171,9 @@ async function contextNode(state: typeof DatasetEvalAnnotation.State) {
   const { dataset, preview, tableName, userQuery } = state;
 
   // Call the context agent
-  // const { summary } = await contextAgent.invoke({
-  //   dataset,
-  // });
-
-  const summary = MOCK_CONTEXT_SUMMARY;
+  const { summary } = await contextAgent.invoke({
+    dataset,
+  });
 
   // Construct the prompt for the model, including the context from the context agent
   const prompt = await QUERY_AGENT_SQL_QUERY_PROMPT.formatMessages({
