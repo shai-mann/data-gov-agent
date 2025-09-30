@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import dataGovAgent from './agents/dataGovAgent';
 import queryAgent from './agents/queryAgent';
 import datasetSearchAgent from './agents/searchAgent';
+import shallowEvalAgent from './agents/shallowEvalAgent';
+import { packageShow } from './tools';
 
 const app = new Hono();
 
@@ -68,6 +70,35 @@ v1.post('/test/dataset-search', async c => {
     });
   } catch (error) {
     console.error('Search Agent error:', error);
+    return c.json(
+      {
+        success: false,
+        error:
+          error instanceof Error ? error.message : 'Unknown error occurred',
+      },
+      500
+    );
+  }
+});
+
+v1.post('/test/shallow-eval', async c => {
+  try {
+    const { datasetId } = await c.req.json();
+
+    const dataset = await packageShow.invoke({
+      packageId: datasetId,
+    });
+
+    const result = await shallowEvalAgent.invoke({
+      dataset,
+    });
+
+    return c.json({
+      success: true,
+      result,
+    });
+  } catch (error) {
+    console.error('Shallow eval error:', error);
     return c.json(
       {
         success: false,
