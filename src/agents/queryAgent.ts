@@ -26,6 +26,7 @@ import { workingDatasetMemory } from '../tools/datasetDownload';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
+import contextAgent from './contextAgent';
 
 // Create a persistent DuckDB connection in memory
 const instance = await DuckDBInstance.create(':memory:');
@@ -84,6 +85,8 @@ const sqlQueryTool = tool(
 const DatasetEvalAnnotation = Annotation.Root({
   ...MessagesAnnotation.spec,
   dataset: Annotation<DatasetWithEvaluation>,
+  datasetLink: Annotation<string>,
+  tableName: Annotation<string>,
   userQuery: Annotation<string>,
   sqlQuery: Annotation<string>,
   summary: Annotation<z.infer<typeof QueryAgentSummarySchema>>,
@@ -107,7 +110,7 @@ const tableNameStructuredModel = openai.withStructuredOutput(
 /* QUERYING WORKFLOW */
 
 async function setupNode(state: typeof DatasetEvalAnnotation.State) {
-  const { dataset, userQuery } = state;
+  const { dataset } = state;
 
   console.log('🔍 [QUERY] Initializing...');
 
@@ -142,12 +145,26 @@ async function setupNode(state: typeof DatasetEvalAnnotation.State) {
     );
   }
 
-  // Construct the prompt for the model
-  const prompt = await QUERY_AGENT_SQL_QUERY_PROMPT.formatMessages({
-    tableName: table,
-    query: userQuery,
-    context: dataset.evaluation.reasoning,
+  return {
     datasetLink: dataset.evaluation.bestResource,
+    tableName: table,
+  };
+}
+
+async function contextNode(state: typeof DatasetEvalAnnotation.State) {
+  const { dataset, datasetLink, tableName, userQuery } = state;
+
+  // Call the context agent
+  const { summary } = await contextAgent.invoke({
+    dataset,
+  });
+
+  // Construct the prompt for the model, including the context from the context agent
+  const prompt = await QUERY_AGENT_SQL_QUERY_PROMPT.formatMessages({
+    tableName,
+    query: userQuery,
+    context: summary,
+    datasetLink,
     datasetId: dataset.id,
   });
 
@@ -205,12 +222,14 @@ function shouldContinue(state: typeof DatasetEvalAnnotation.State) {
 
 const graph = new StateGraph(DatasetEvalAnnotation)
   .addNode('setup', setupNode)
+  .addNode('context', contextNode)
   .addNode('model', modelNode)
   .addNode('toolNode', new ToolNode(tools))
   .addNode('output', outputNode)
 
   .addEdge(START, 'setup')
-  .addEdge('setup', 'model')
+  .addEdge('setup', 'context')
+  .addEdge('context', 'model')
   .addConditionalEdges('model', shouldContinue, ['toolNode', 'output'])
   .addEdge('toolNode', 'model')
   .addEdge('output', END)
