@@ -15,13 +15,13 @@ import searchAgent from '../searchAgent';
 import evalAgent from '../evalAgent';
 import { openai } from '../../llms';
 import { z } from 'zod';
+import queryAgent from '../queryAgent';
+import { getPackage } from '../../lib/data-gov';
 import {
   DATA_GOV_FINAL_EVALUATION_PROMPT,
   DATA_GOV_FINAL_SELECTION_PROMPT,
   DATA_GOV_USER_QUERY_FORMATTING_PROMPT,
-} from '../../lib/prompts';
-import queryAgent from '../queryAgent';
-import { getPackage } from '../../lib/data-gov';
+} from './prompts';
 
 /*
 NOTE: This **was** a core agent (running exactly as you see below), but due to token limitations (20k tokens/min for my account),
