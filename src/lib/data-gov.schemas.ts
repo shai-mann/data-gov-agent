@@ -46,7 +46,7 @@ export const PackageShowSchema = z.object({
       url: z.string(),
       name: z.string(),
       format: z.string(),
-      mimetype: z.string(),
+      mimetype: z.string().nullable(),
       description: z.string(),
     })
   ),

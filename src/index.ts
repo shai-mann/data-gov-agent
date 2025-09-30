@@ -3,7 +3,8 @@ import dataGovAgent from './agents/dataGovAgent';
 import queryAgent from './agents/queryAgent';
 import datasetSearchAgent from './agents/searchAgent';
 import shallowEvalAgent from './agents/shallowEvalAgent';
-import { packageShow } from './tools';
+import { datasetDownload, packageShow } from './tools';
+import contextAgent from './agents/contextAgent';
 
 const app = new Hono();
 
@@ -107,6 +108,24 @@ v1.post('/test/shallow-eval', async c => {
   }
 });
 
+v1.post('/test/context', async c => {
+  try {
+    const { dataset } = await c.req.json();
+
+    const result = await contextAgent.invoke({
+      dataset,
+    });
+
+    return c.json({
+      success: true,
+      ...result,
+    });
+  } catch (error) {
+    console.error('Context Agent error:', error);
+    return c.json({ error: 'Internal Server Error' }, 500);
+  }
+});
+
 v1.post('/test/query', async c => {
   try {
     const { query, dataset } = await c.req.json();
@@ -114,6 +133,11 @@ v1.post('/test/query', async c => {
     if (!query || !dataset) {
       return c.json({ error: 'Query and dataset are required' }, 400);
     }
+
+    // Pre-fetch the dataset
+    await datasetDownload.invoke({
+      resourceUrl: dataset.evaluation.bestResource,
+    });
 
     const result = await queryAgent.invoke(
       {

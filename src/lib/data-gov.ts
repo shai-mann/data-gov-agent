@@ -3,7 +3,6 @@ import {
   PackageAutocompleteResponseSchema,
   PackageSearchResponse,
   PackageSearchResponseSchema,
-  SinglePackageResponse,
   SinglePackageResponseSchema,
 } from './data-gov.schemas';
 
@@ -52,5 +51,5 @@ export async function getPackage(packageId: string) {
   // Validate the response
   const result = SinglePackageResponseSchema.parse(await response.json());
 
-  return result satisfies SinglePackageResponse;
+  return result;
 }
