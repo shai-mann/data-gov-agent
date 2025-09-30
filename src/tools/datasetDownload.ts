@@ -1,9 +1,7 @@
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
-import { ONE_SECOND } from '../lib/utils';
-
-// TODO: This is a hack to store the dataset in memory so we don't have to download it multiple times
-export const workingDatasetMemory: Record<string, string[]> = {};
+import { ONE_SECOND } from '@lib/utils';
+import { workingDatasetMemory } from '@lib/database';
 
 /**
  * Download and preview a dataset from data.gov (first 100 rows)

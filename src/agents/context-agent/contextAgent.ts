@@ -5,15 +5,17 @@ import {
   START,
   StateGraph,
 } from '@langchain/langgraph';
-import { openai } from '../llms';
+import { openai } from '@llms';
 import { z } from 'zod';
-import { CONTEXT_AGENT_INITIAL_PROMPT } from '../lib/prompts';
-import { DatasetWithEvaluation } from '../lib/annotation';
-import { getPackage } from '../lib/data-gov';
-import { doiView } from '../tools/doiView';
-import { datasetDownload } from '../tools/datasetDownload';
+import { CONTEXT_AGENT_INITIAL_PROMPT } from './prompts';
+import { DatasetWithEvaluation } from '@lib/annotation';
+import { getPackage } from '@lib/data-gov';
+import { doiView } from '@tools/doiView';
+import { datasetDownload } from '@tools/datasetDownload';
 
 const URL_REGEX = /(https?:\/\/[^\s"']+)/g;
+
+/* ANNOTATIONS */
 
 const ContextAgentAnnotation = Annotation.Root({
   ...MessagesAnnotation.spec,
@@ -22,9 +24,13 @@ const ContextAgentAnnotation = Annotation.Root({
   summary: Annotation<string>, // Raw text summary output from the model
 });
 
+/* MODELS */
+
 const structuredModel = openai.withStructuredOutput(
   z.object({ summary: z.string() })
 );
+
+/* NODES */
 
 async function setupNode(state: typeof ContextAgentAnnotation.State) {
   const { dataset } = state;
@@ -100,7 +106,9 @@ async function setupNode(state: typeof ContextAgentAnnotation.State) {
   };
 }
 
-// Core evaluation prompt (evaluates a single dataset in the context of the user query)
+/**
+ * Core evaluation prompt (evaluates a single dataset in the context of the user query)
+ */
 async function modelNode(state: typeof ContextAgentAnnotation.State) {
   console.log('🔍 [CONTEXT] Providing context...');
 

@@ -1,7 +1,7 @@
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
-import { searchPackages } from '../lib/data-gov';
-import { PackageShowSchema } from '../lib/data-gov.schemas';
+import { searchPackages } from '@lib/data-gov';
+import { PackageShowSchema } from '@lib/data-gov.schemas';
 
 /**
  * Search for packages (datasets) on data.gov using the CKAN API

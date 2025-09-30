@@ -9,24 +9,31 @@ import {
   DatasetSelection,
   DatasetWithEvaluation,
   QueryAgentSummarySchema,
-} from '../lib/annotation';
+} from '@lib/annotation';
 import { Send } from '@langchain/langgraph';
-import searchAgent from './searchAgent';
-import evalAgent from './evalAgent';
-import { openai } from '../llms';
+import { openai } from '@llms';
 import { z } from 'zod';
+import { queryAgent, searchAgent, evalAgent } from '..';
+import { getPackage } from '@lib/data-gov';
 import {
   DATA_GOV_FINAL_EVALUATION_PROMPT,
   DATA_GOV_FINAL_SELECTION_PROMPT,
   DATA_GOV_USER_QUERY_FORMATTING_PROMPT,
-} from '../lib/prompts';
-import queryAgent from './queryAgent';
-import { getPackage } from '../lib/data-gov';
+} from './prompts';
+
+/*
+NOTE: This **was** a core agent (running exactly as you see below), but due to token limitations (20k tokens/min for my account),
+I'm submitting the separate agents for search, eval, and query, rather than this full combined agent.
+
+This code still exists so you can see how it would all get stitched together, but the project itself lives in the other agent files.
+*/
+
+/* ANNOTATIONS */
 
 /**
- * Main annotation for the data-gov agent.
+ * Main annotation for the gov researcher agent.
  */
-const DataGovAnnotation = Annotation.Root({
+const GovResearcherAnnotation = Annotation.Root({
   ...MessagesAnnotation.spec,
   datasets: Annotation<DatasetSelection[]>({
     reducer: (cur, val) => cur.concat(val),
@@ -50,13 +57,26 @@ const EvalDatasetAnnotation = Annotation.Root({
   userQuery: Annotation<string>(),
 });
 
+/* MODELS */
+
 const formattingStructuredModel = openai.withStructuredOutput(
   z.object({
     query: z.string(),
   })
 );
 
-async function userQueryFormattingNode(state: typeof DataGovAnnotation.State) {
+const structuredModel = openai.withStructuredOutput(
+  z.object({
+    type: z.literal('dataset').or(z.literal('none')),
+    id: z.string().optional().nullable(),
+  })
+);
+
+/* NODES */
+
+async function userQueryFormattingNode(
+  state: typeof GovResearcherAnnotation.State
+) {
   const { userQuery } = state;
   const prompt = await DATA_GOV_USER_QUERY_FORMATTING_PROMPT.formatMessages({
     query: userQuery,
@@ -71,7 +91,7 @@ async function userQueryFormattingNode(state: typeof DataGovAnnotation.State) {
   return { userQuery: result.query };
 }
 
-async function searchNode(state: typeof DataGovAnnotation.State) {
+async function searchNode(state: typeof GovResearcherAnnotation.State) {
   const { userQuery } = state;
 
   const { datasets } = await searchAgent.invoke(
@@ -93,7 +113,7 @@ async function searchNode(state: typeof DataGovAnnotation.State) {
 /**
  * Conditional edge function to construct the fan-out for evaluating datasets.
  */
-function continueToEval(state: typeof DataGovAnnotation.State) {
+function continueToEval(state: typeof GovResearcherAnnotation.State) {
   const { datasets, userQuery } = state;
 
   console.log(
@@ -123,15 +143,8 @@ async function evalNode(state: typeof EvalDatasetAnnotation.State) {
   };
 }
 
-const structuredModel = openai.withStructuredOutput(
-  z.object({
-    type: z.literal('dataset').or(z.literal('none')),
-    id: z.string().optional().nullable(),
-  })
-);
-
 async function datasetFinalSelectionNode(
-  state: typeof DataGovAnnotation.State
+  state: typeof GovResearcherAnnotation.State
 ) {
   const { evaluatedDatasets, userQuery } = state;
 
@@ -169,7 +182,7 @@ async function datasetFinalSelectionNode(
   };
 }
 
-async function queryNode(state: typeof DataGovAnnotation.State) {
+async function queryNode(state: typeof GovResearcherAnnotation.State) {
   const { finalDataset, userQuery } = state;
 
   if (!finalDataset) {
@@ -193,7 +206,9 @@ async function queryNode(state: typeof DataGovAnnotation.State) {
   };
 }
 
-async function emitFinalEvaluationNode(state: typeof DataGovAnnotation.State) {
+async function emitFinalEvaluationNode(
+  state: typeof GovResearcherAnnotation.State
+) {
   const { summary, finalDataset, userQuery } = state;
 
   if (!finalDataset) {
@@ -216,19 +231,22 @@ async function emitFinalEvaluationNode(state: typeof DataGovAnnotation.State) {
   };
 }
 
+/* EDGES */
+
 async function shouldContinueWithSelection(
-  state: typeof DataGovAnnotation.State
+  state: typeof GovResearcherAnnotation.State
 ) {
   const { finalDataset } = state;
   // If no dataset is selected, we end early.
   return finalDataset ? 'query' : END;
 }
 
-// Build the data-gov agent workflow
-const graph = new StateGraph(DataGovAnnotation)
+// Build the gov researcher agent workflow
+const graph = new StateGraph(GovResearcherAnnotation)
   .addNode('format', userQueryFormattingNode)
   .addNode('search', searchNode)
   .addNode('eval', evalNode)
+  // Defer the selection node, so all evaluation nodes complete before it runs.
   .addNode('select', datasetFinalSelectionNode, { defer: true })
   .addNode('query', queryNode)
   .addNode('emitOutput', emitFinalEvaluationNode)

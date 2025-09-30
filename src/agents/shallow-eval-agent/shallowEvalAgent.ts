@@ -1,6 +1,3 @@
-// This agent is a shallow evaluation helper agent for the core Search Agent.
-// It's used to shallowly evaluate a single dataset that the search agent finds, and determine if it's likely to answer the user's question.
-
 import {
   Annotation,
   END,
@@ -9,14 +6,21 @@ import {
   START,
   StateGraph,
 } from '@langchain/langgraph';
-import { openai } from '../llms';
-import { ShallowEvaluationSchema } from '../lib/annotation';
+import { openai } from '@llms';
+import { ShallowEvaluationSchema } from '@lib/annotation';
 import { z } from 'zod';
-import { PackageShowResponse } from '../lib/data-gov.schemas';
+import { PackageShowResponse } from '@lib/data-gov.schemas';
 import {
   DATA_GOV_SHALLOW_EVAL_SINGLE_RESOURCE_PROMPT,
   DATA_GOV_SHALLOW_EVAL_SUMMATIVE_PROMPT,
-} from '../lib/prompts';
+} from './prompts';
+
+/**
+ * This agent is a shallow evaluation helper agent for the core Search Agent.
+ * It's used to shallowly evaluate a single dataset that the search agent finds, and determine if it's likely to answer the user's question.
+ */
+
+/* ANNOTATIONS */
 
 const ShallowSearchAnnotation = Annotation.Root({
   ...MessagesAnnotation.spec,
@@ -34,12 +38,16 @@ const ResourceEvaluationAnnotation = Annotation.Root({
   userQuery: Annotation<string>(),
 });
 
+/* MODELS */
+
 // Structured model to evaluate a single resource in the dataset
 const structuredModel = openai.withStructuredOutput(ShallowEvaluationSchema);
 
 const structuredSummativeModel = openai.withStructuredOutput(
   ShallowEvaluationSchema
 );
+
+/* NODES */
 
 async function setupNode() {
   // We only need a node here so we can fan-out in the edge.
@@ -83,6 +91,8 @@ async function summativeEvaluationNode(
   console.log('🔍 [SHALLOW EVAL] Exiting workflow');
   return { evaluation };
 }
+
+/* EDGES */
 
 async function fanOutEdge(state: typeof ShallowSearchAnnotation.State) {
   const {
