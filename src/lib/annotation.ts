@@ -45,3 +45,10 @@ export const QueryAgentSummarySchema = z.object({
   results: z.string().describe('The results of the SQL query'),
   summary: z.string().describe('A summary of the results of the SQL query'),
 });
+
+export const ShallowEvaluationSchema = z.object({
+  mimeType: z.string(),
+  isCompatible: z.boolean(),
+  link: z.string(),
+  reasoning: z.string(),
+});

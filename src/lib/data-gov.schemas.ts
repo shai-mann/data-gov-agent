@@ -32,3 +32,24 @@ export const SinglePackageResponseSchema = z.object({
 });
 
 export type SinglePackageResponse = z.infer<typeof SinglePackageResponseSchema>;
+
+export const PackageShowSchema = z.object({
+  id: z.string(),
+  notes: z.string(),
+  name: z.string(),
+  title: z.string(),
+  type: z.string(),
+  state: z.string(), // active, not active, etc.
+
+  resources: z.array(
+    z.object({
+      url: z.string(),
+      name: z.string(),
+      format: z.string(),
+      mimetype: z.string(),
+      description: z.string(),
+    })
+  ),
+});
+
+export type PackageShowResponse = z.infer<typeof PackageShowSchema>;

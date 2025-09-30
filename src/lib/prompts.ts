@@ -51,31 +51,21 @@ export const DATA_GOV_SEARCH_PROMPT = ChatPromptTemplate.fromMessages([
 
 The user wants datasets that can answer their question: "{query}".
 
-Your task is to provide a list of the **most relevant datasets** using only the tools provided. You have access to:
+Your task is to provide a list of the datasets that are **likely to answer the user's question** using only the tools provided. You have access to:
 
 - packageNameSearch: Find datasets by name or similar keywords (metadata may be limited). Use one keyword (max two) here, and skip obvious terms like "U.S."
 - packageSearch: Search for datasets by keywords (includes metadata). Use more targeted keywords here, focusing on the user’s query and any promising dataset names you found in the previous step.
-- selectDataset: Select a dataset by providing its ID, title, and a short reason why it may help answer the user’s question.
 
 Follow this workflow carefully:
 
-1. **Start with a batch of varied packageNameSearch calls** to identify promising dataset names or related keywords. Repeat this step until you have a solid list of keywords.
-2. **Use a batch ofpackageSearch calls** with refined keywords to retrieve datasets.
-3. **As soon as you find a dataset that looks promising**, immediately call **selectDataset** with its ID, title, and your reason for selecting it. Do this each time you encounter a good candidate, not just at the end.
-4. **Verify format compatibility**: only select datasets that clearly provide CSV resources. Do NOT select datasets in unsupported formats.
-5. **Iterate** as needed: adjust keywords, limits, or offsets, and continue searching until you have selected about 10 strong candidates.
+1. **Start with a batch of varied packageNameSearch calls** to identify likely dataset names or related keywords. Repeat this step until you have a solid list of keywords.
+2. **Use a batch of packageSearch calls** with refined keywords informed by the previous step to retrieve datasets.
+4. **Iterate** as needed: adjust keywords, limits, or offsets, and continue searching until you have selected about 10 strong candidates.
 
 Guidelines:
 
-- Prioritize datasets that are directly relevant to the user’s query.
 - Use precise keywords; avoid vague or overly broad terms.
-- Ensure every dataset you select could realistically be used to answer the user’s question.
-
-Important:
-- Always use selectDataset at the moment you identify a strong candidate.
-- Do not wait until the end to select; your goal is to build up the list incrementally as you search.
-- Output only the selected datasets; do not include explanations or commentary outside of selectDataset calls.
-- You do NOT need to select all datasets from a single search result. You should expect to make multiple iterations through the workflow.
+- Use limited keywords; avoid long search strings.
 `,
   },
 ]);
@@ -83,7 +73,7 @@ Important:
 export const DATA_GOV_REMINDER_PROMPT = ChatPromptTemplate.fromMessages([
   {
     role: 'system',
-    content: `REMINDER: The user's query is: "{query}". Find 5-10 datasets that are relevant to the user's question. You currently have {datasetCount} datasets selected.
+    content: `REMINDER: The user's query is: "{query}". Find 10-15 UNIQUE datasets that are relevant to the user's question. You currently have {datasetCount} datasets selected.
 
     The datasets you have selected so far are: {datasetIds}.
 

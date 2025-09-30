@@ -102,7 +102,7 @@ async function evalNode(state: typeof EvalDatasetAnnotation.State) {
     userQuery,
   });
 
-  // If the dataset is not relevant, don't add it to the state.
+  // If the dataset is not usable, don't add it to the state.
   if (evaluatedDataset.evaluation?.usable === false) {
     return {};
   }

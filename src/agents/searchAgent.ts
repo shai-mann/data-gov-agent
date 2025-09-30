@@ -2,21 +2,24 @@ import {
   Annotation,
   END,
   MessagesAnnotation,
+  Send,
   START,
   StateGraph,
 } from '@langchain/langgraph';
-import { isAIMessage, isToolMessage } from '@langchain/core/messages';
 import { ToolNode } from '@langchain/langgraph/prebuilt';
-import { packageSearch, packageNameSearch, selectDataset } from '../tools';
+import { packageSearch, packageNameSearch, packageShow } from '../tools';
 import { openai } from '../llms';
 import {
   DATA_GOV_REMINDER_PROMPT,
   DATA_GOV_SEARCH_PROMPT,
 } from '../lib/prompts';
 import { DatasetSelection } from '../lib/annotation';
+import { getLastAiMessageIndex, getToolMessages } from '../lib/utils';
+import { z } from 'zod';
+import shallowEvalAgent from './shallowEvalAgent';
 
-// It can return with fewer than this (it's asked for 10), but this is a backstop to prevent recursion caps from being hit.
-const MAX_REQUESTED_DATASETS = 15;
+// It can return with fewer than this (it's asked for 10-15), but this is a backstop to prevent recursion caps from being hit.
+const MAX_REQUESTED_DATASETS = 20;
 
 // State annotation for the dataset selection workflow
 const DatasetSearchAnnotation = Annotation.Root({
@@ -25,14 +28,21 @@ const DatasetSearchAnnotation = Annotation.Root({
     reducer: (cur, val) => cur.concat(val),
     default: () => [],
   }),
+  pendingDatasets: Annotation<string[]>(),
   userQuery: Annotation<string>(),
 });
 
-const tools = [packageSearch, packageNameSearch, selectDataset];
+/**
+ * Simple annotation for a shallow evaluation of a dataset. Used in fan-out for shallowly evaluating datasets.
+ */
+const EvalDatasetAnnotation = Annotation.Root({
+  datasetId: Annotation<string>(),
+});
+
+const tools = [packageSearch, packageNameSearch];
 
 const model = openai.bindTools(tools);
 
-// Entry node - extracts user query before calling the model
 async function setupNode(state: typeof DatasetSearchAnnotation.State) {
   const { userQuery } = state;
 
@@ -51,7 +61,6 @@ async function setupNode(state: typeof DatasetSearchAnnotation.State) {
   };
 }
 
-// An LLM node with access to tools to search for datasets by query (including or excluding metadata)
 async function modelNode(state: typeof DatasetSearchAnnotation.State) {
   console.log(
     '🔍 Calling model... currently has',
@@ -72,45 +81,50 @@ async function modelNode(state: typeof DatasetSearchAnnotation.State) {
   };
 }
 
-// Middle node to process dataset evaluation results
-async function processDatasetSelectionNode(
-  state: typeof DatasetSearchAnnotation.State
-) {
+// Middle node to process calls from tools and perform additional post-processing
+async function postToolsNode(state: typeof DatasetSearchAnnotation.State) {
   console.log('⚖️ Tool post-processing Node - Processing tool results...');
   const { messages } = state;
 
   // Since it could be a batch of tool calls, we need to find all tool calls since the last AI message
-  const lastAiMessageIndex =
-    messages
-      // find index of last AIMessage
-      .map((m, i) => [m, i] as const)
-      .filter(([m]) => isAIMessage(m))
-      .map(([, i]) => i)
-      .pop() ?? -1;
+  const lastAiMessageIndex = getLastAiMessageIndex(messages);
 
-  const toolMessages = messages
-    .slice(lastAiMessageIndex + 1)
-    .filter(m => isToolMessage(m))
-    .filter(m => m.name === 'selectDataset')
-    .filter(m => m.content && typeof m.content === 'string')
-    .map(m => JSON.parse(m.content as string))
-    // Filter out any datasets that already exist in the state
-    .filter(m => !state.datasets.some(d => d.id === m.id));
+  // Find all packageSearch tool calls
+  const packageSearchToolMessages = getToolMessages(
+    messages,
+    'package_search',
+    lastAiMessageIndex + 1
+  );
 
-  if (toolMessages.length === 0) {
-    console.log('🔍 No new selectDataset tool calls found');
+  // Extract IDs of the datasets that were found in the packageSearch tool calls
+  const packageSearchDatasetIds = packageSearchToolMessages
+    .map(p => z.array(z.object({ id: z.string() })).parse(p.results))
+    .map(m => m.map(r => r.id))
+    .flat();
+
+  return { pendingDatasets: packageSearchDatasetIds };
+}
+
+async function shallowEvalNode(state: typeof EvalDatasetAnnotation.State) {
+  const { datasetId } = state;
+
+  const dataset = await packageShow.invoke({
+    packageId: datasetId,
+  });
+
+  const { evaluation } = await shallowEvalAgent.invoke({
+    dataset,
+  });
+
+  // If the dataset is not compatible, don't add it to the state.
+  if (!evaluation.isCompatible) {
     return {};
   }
 
-  console.log(`🔍 Adding ${toolMessages.length} new selections`);
-
-  // Add new selections to the state
-  return {
-    datasets: toolMessages,
-  };
+  // Uses state key for outer state, so it will automatically go there.
+  return { datasets: dataset };
 }
 
-// Conditional edge function to route to tools, or exit the search workflow
 function shouldContinueToTools(state: typeof DatasetSearchAnnotation.State) {
   const { messages } = state;
   const lastMessage = messages[messages.length - 1];
@@ -130,15 +144,25 @@ function shouldContinueToTools(state: typeof DatasetSearchAnnotation.State) {
 }
 
 // Conditional edge to route from post-tools node either to the model or to the end, depending on whether the AI has found enough datasets
-function shouldContinueFromPostTools(
-  state: typeof DatasetSearchAnnotation.State
-) {
+function shouldContinueToModel(state: typeof DatasetSearchAnnotation.State) {
   const { datasets } = state;
   if (datasets.length >= MAX_REQUESTED_DATASETS) {
     console.log('🔍 Exiting search workflow - reached max requested datasets');
     return END;
   }
+
   return 'model';
+}
+
+function shouldContinueToEval(state: typeof DatasetSearchAnnotation.State) {
+  const { pendingDatasets } = state;
+  if (pendingDatasets.length === 0) {
+    console.log('🔍 No pending datasets, skipping shallowEval');
+    return 'model';
+  }
+
+  console.log('🔍 Shallow evaluating', pendingDatasets.length, 'datasets');
+  return pendingDatasets.map(id => new Send('shallowEval', { datasetId: id }));
 }
 
 // Build the data-gov agent workflow
@@ -146,13 +170,18 @@ const graph = new StateGraph(DatasetSearchAnnotation)
   .addNode('setup', setupNode)
   .addNode('model', modelNode)
   .addNode('tools', new ToolNode(tools))
-  .addNode('postTools', processDatasetSelectionNode)
+  .addNode('postTools', postToolsNode)
+  .addNode('shallowEval', shallowEvalNode)
 
   .addEdge(START, 'setup')
   .addEdge('setup', 'model')
-  .addEdge('tools', 'postTools')
-  .addConditionalEdges('postTools', shouldContinueFromPostTools, ['model', END])
   .addConditionalEdges('model', shouldContinueToTools, ['tools', END])
+  .addEdge('tools', 'postTools')
+  .addConditionalEdges('postTools', shouldContinueToEval, [
+    'shallowEval',
+    'model',
+  ])
+  .addConditionalEdges('shallowEval', shouldContinueToModel, ['model', END])
 
   .compile();
 

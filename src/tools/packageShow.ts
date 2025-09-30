@@ -1,6 +1,7 @@
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import { getPackage } from '../lib/data-gov';
+import { PackageShowSchema } from '../lib/data-gov.schemas';
 
 /**
  * Get detailed metadata for a specific package (dataset) from data.gov
@@ -11,7 +12,7 @@ export const packageShow = tool(
 
     const { result } = await getPackage(packageId);
 
-    return result;
+    return PackageShowSchema.parse(result);
   },
   {
     name: 'package_show',

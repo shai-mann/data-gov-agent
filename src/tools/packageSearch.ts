@@ -1,6 +1,7 @@
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import { searchPackages } from '../lib/data-gov';
+import { PackageShowSchema } from '../lib/data-gov.schemas';
 
 /**
  * Search for packages (datasets) on data.gov using the CKAN API
@@ -17,25 +18,18 @@ export const packageSearch = tool(
     const packages = result.results.slice(offset, offset + limit);
 
     // Extract only necessary keys from the package object
-    const massagedPackages = packages.map(pkg => ({
-      id: pkg.id,
-      isopen: pkg.isopen,
-      license_title: pkg.license_title,
-      maintainer: pkg.maintainer,
-      name: pkg.name,
-      notes: pkg.notes,
-      num_resources: pkg.num_resources,
-      num_tags: pkg.num_tags,
-      organization: pkg.organization,
-      owner_org: pkg.owner_org,
-      private: pkg.private,
-      state: pkg.state,
-      title: pkg.title,
-      type: pkg.type,
-      url: pkg.url,
-      version: pkg.version,
-      extras: pkg.extras,
-    }));
+    const massagedPackages = packages
+      .map(pkg => ({
+        id: pkg.id,
+        notes: pkg.notes,
+        name: pkg.name,
+        title: pkg.title,
+        type: pkg.type,
+        state: pkg.state, // active, not active, etc.
+
+        resources: pkg.resources,
+      }))
+      .map(pkg => PackageShowSchema.parse(pkg));
 
     console.log(
       `🔍 Package Search - Found ${massagedPackages.length} packages`
