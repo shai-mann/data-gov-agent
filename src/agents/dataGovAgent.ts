@@ -66,6 +66,8 @@ async function userQueryFormattingNode(state: typeof DataGovAnnotation.State) {
 
   const result = await formattingStructuredModel.invoke(prompt);
 
+  console.log('🔍 [CORE] Constructed more specific user query: ', result.query);
+
   return { userQuery: result.query };
 }
 

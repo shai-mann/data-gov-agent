@@ -51,7 +51,7 @@ export const DATA_GOV_SEARCH_PROMPT = ChatPromptTemplate.fromMessages([
 
 The user wants datasets that can answer their question: "{query}".
 
-Your task is to provide a list of the datasets that are **likely to answer the user's question** using only the tools provided. You have access to:
+Your task is to provide a list 4-5 datasets that are **likely to answer the user's question** using only the tools provided. You have access to:
 
 - packageNameSearch: Find datasets by name or similar keywords (metadata may be limited). Use one keyword (max two) here, and skip obvious terms like "U.S."
 - packageSearch: Search for datasets by keywords (includes metadata). Use more targeted keywords here, focusing on the user’s query and any promising dataset names you found in the previous step.
