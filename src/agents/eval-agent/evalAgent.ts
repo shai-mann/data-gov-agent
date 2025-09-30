@@ -9,22 +9,25 @@ import {
   DATA_GOV_EVALUATE_DATASET_PROMPT,
   DATA_GOV_EVALUATE_OUTPUT_PROMPT,
   DATA_GOV_EVALUATE_REMINDER_PROMPT,
-} from '../lib/prompts';
+} from './prompts';
 import {
   DatasetWithEvaluation,
   DatasetWithEvaluationSchema,
-} from '../lib/annotation';
-import { openai } from '../llms';
-import { datasetDownload, doiView, packageShow } from '../tools';
+} from '../../lib/annotation';
+import { openai } from '../../llms';
+import { datasetDownload, doiView, packageShow } from '../../tools';
 import { ToolNode } from '@langchain/langgraph/prebuilt';
 import { AIMessage } from '@langchain/core/messages';
 
-// State annotation for the dataset evaluation workflow
+/* ANNOTATIONS */
+
 const DatasetEvalAnnotation = Annotation.Root({
   ...MessagesAnnotation.spec,
   dataset: Annotation<DatasetWithEvaluation>,
   userQuery: Annotation<string>,
 });
+
+/* MODELS */
 
 const tools = [packageShow, datasetDownload, doiView];
 
@@ -33,7 +36,7 @@ const structuredModel = openai.withStructuredOutput(
   DatasetWithEvaluationSchema
 );
 
-/* DATASET EVALUATION WORKFLOW */
+/* NODES */
 
 async function setupNode(state: typeof DatasetEvalAnnotation.State) {
   const { dataset, userQuery } = state;
@@ -52,7 +55,6 @@ async function setupNode(state: typeof DatasetEvalAnnotation.State) {
   };
 }
 
-// Core evaluation prompt (evaluates a single dataset in the context of the user query)
 async function modelNode(state: typeof DatasetEvalAnnotation.State) {
   console.log('🔍 [EVAL] Evaluating...');
 
@@ -107,6 +109,8 @@ async function outputNode(state: typeof DatasetEvalAnnotation.State) {
     dataset: massagedEvaluation,
   };
 }
+
+/* EDGES */
 
 function shouldContinue(state: typeof DatasetEvalAnnotation.State) {
   const messages = state.messages;

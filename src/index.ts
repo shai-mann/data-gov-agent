@@ -1,10 +1,12 @@
 import { Hono } from 'hono';
-import dataGovAgent from './agents/core-agent/coreAgent';
-import queryAgent from './agents/queryAgent';
-import datasetSearchAgent from './agents/search-agent/searchAgent';
-import shallowEvalAgent from './agents/shallow-eval-agent/shallowEvalAgent';
 import { datasetDownload, packageShow } from './tools';
-import contextAgent from './agents/context-agent/contextAgent';
+import {
+  contextAgent,
+  coreAgent,
+  queryAgent,
+  searchAgent,
+  shallowEvalAgent,
+} from './agents';
 
 const app = new Hono();
 
@@ -25,7 +27,7 @@ v1.post('/data-gov/search', async c => {
       return c.json({ error: 'Query parameter is required' }, 400);
     }
 
-    const result = await dataGovAgent.invoke({
+    const result = await coreAgent.invoke({
       userQuery: query,
     });
 
@@ -54,7 +56,7 @@ v1.post('/test/dataset-search', async c => {
       return c.json({ error: 'Query parameter is required' }, 400);
     }
 
-    const result = await datasetSearchAgent.invoke({
+    const result = await searchAgent.invoke({
       userQuery: query,
     });
 

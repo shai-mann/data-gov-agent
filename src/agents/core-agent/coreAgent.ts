@@ -11,11 +11,9 @@ import {
   QueryAgentSummarySchema,
 } from '../../lib/annotation';
 import { Send } from '@langchain/langgraph';
-import searchAgent from '../search-agent/searchAgent';
-import evalAgent from '../evalAgent';
 import { openai } from '../../llms';
 import { z } from 'zod';
-import queryAgent from '../queryAgent';
+import { queryAgent, searchAgent, evalAgent } from '..';
 import { getPackage } from '../../lib/data-gov';
 import {
   DATA_GOV_FINAL_EVALUATION_PROMPT,
