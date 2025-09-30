@@ -4,6 +4,7 @@ import queryAgent from './agents/queryAgent';
 import datasetSearchAgent from './agents/searchAgent';
 import shallowEvalAgent from './agents/shallowEvalAgent';
 import { datasetDownload, packageShow } from './tools';
+import contextAgent from './agents/contextAgent';
 
 const app = new Hono();
 
@@ -104,6 +105,25 @@ v1.post('/test/shallow-eval', async c => {
       },
       500
     );
+  }
+});
+
+v1.post('/test/context', async c => {
+  try {
+    const { dataset } = await c.req.json();
+
+    const result = await contextAgent.invoke({
+      dataset,
+    });
+
+    return c.json({
+      success: true,
+      result: result.summary,
+      messages: result.messages,
+    });
+  } catch (error) {
+    console.error('Context Agent error:', error);
+    return c.json({ error: 'Internal Server Error' }, 500);
   }
 });
 
