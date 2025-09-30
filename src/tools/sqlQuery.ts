@@ -1,5 +1,5 @@
 import { tool } from 'langchain';
-import { conn } from '../lib/duckdb';
+import { conn } from '@lib/database';
 import { z } from 'zod';
 
 export const sqlQueryTool = tool(

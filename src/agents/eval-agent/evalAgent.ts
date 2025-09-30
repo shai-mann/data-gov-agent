@@ -13,9 +13,9 @@ import {
 import {
   DatasetWithEvaluation,
   DatasetWithEvaluationSchema,
-} from '../../lib/annotation';
-import { openai } from '../../llms';
-import { datasetDownload, doiView, packageShow } from '../../tools';
+} from '@lib/annotation';
+import { openai } from '@llms';
+import { datasetDownload, doiView, packageShow } from '@tools';
 import { ToolNode } from '@langchain/langgraph/prebuilt';
 import { AIMessage } from '@langchain/core/messages';
 

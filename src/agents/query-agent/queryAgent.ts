@@ -15,22 +15,19 @@ import {
 import {
   DatasetWithEvaluation,
   QueryAgentSummarySchema,
-} from '../../lib/annotation';
-import { openai } from '../../llms';
+} from '@lib/annotation';
+import { openai } from '@llms';
 import { ToolNode } from '@langchain/langgraph/prebuilt';
 import { AIMessage } from '@langchain/core/messages';
 import { z } from 'zod';
-import {
-  datasetDownload,
-  workingDatasetMemory,
-} from '../../tools/datasetDownload';
+import { datasetDownload } from '@tools/datasetDownload';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
-import contextAgent from '../context-agent/contextAgent';
-import { getLastAiMessageIndex, getToolMessages } from '../../lib/utils';
-import { conn } from '../../lib/duckdb';
-import { sqlQueryTool } from '../../tools';
+import contextAgent from '@agents/context-agent/contextAgent';
+import { getLastAiMessageIndex, getToolMessages } from '@lib/utils';
+import { conn, workingDatasetMemory } from '@lib/database';
+import { sqlQueryTool } from '@tools';
 
 const MAX_QUERY_COUNT = 10;
 

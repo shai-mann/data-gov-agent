@@ -7,13 +7,13 @@ import {
   StateGraph,
 } from '@langchain/langgraph';
 import { ToolNode } from '@langchain/langgraph/prebuilt';
-import { packageSearch, packageNameSearch, packageShow } from '../../tools';
-import { openai } from '../../llms';
+import { packageSearch, packageNameSearch, packageShow } from '@tools';
+import { openai } from '@llms';
 import { DATA_GOV_REMINDER_PROMPT, DATA_GOV_SEARCH_PROMPT } from './prompts';
-import { DatasetSelection } from '../../lib/annotation';
-import { getLastAiMessageIndex, getToolMessages } from '../../lib/utils';
+import { DatasetSelection } from '@lib/annotation';
+import { getLastAiMessageIndex, getToolMessages } from '@lib/utils';
 import { z } from 'zod';
-import shallowEvalAgent from '../shallow-eval-agent/shallowEvalAgent';
+import shallowEvalAgent from '@agents/shallow-eval-agent/shallowEvalAgent';
 
 // It can return with fewer than this (it's asked for 4-5), but this is a backstop to prevent recursion caps from being hit.
 const MAX_REQUESTED_DATASETS = 5;

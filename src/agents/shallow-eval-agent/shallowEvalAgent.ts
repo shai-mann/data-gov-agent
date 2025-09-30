@@ -6,10 +6,10 @@ import {
   START,
   StateGraph,
 } from '@langchain/langgraph';
-import { openai } from '../../llms';
-import { ShallowEvaluationSchema } from '../../lib/annotation';
+import { openai } from '@llms';
+import { ShallowEvaluationSchema } from '@lib/annotation';
 import { z } from 'zod';
-import { PackageShowResponse } from '../../lib/data-gov.schemas';
+import { PackageShowResponse } from '@lib/data-gov.schemas';
 import {
   DATA_GOV_SHALLOW_EVAL_SINGLE_RESOURCE_PROMPT,
   DATA_GOV_SHALLOW_EVAL_SUMMATIVE_PROMPT,

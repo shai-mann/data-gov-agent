@@ -1,27 +1,31 @@
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import * as cheerio from 'cheerio';
-import { ONE_SECOND } from '../lib/utils';
+import { ONE_SECOND } from '@lib/utils';
 import * as ExcelJS from 'exceljs';
 
-function getCoreContent($: cheerio.CheerioAPI) {
-  const selectors = [
-    // Most restrictive / semantic
-    'main', // semantic HTML5
-    'article', // common for blog/official docs
-    '.usa-layout-docs__main', // common on US gov sites
-    '.main-content', // common CMS pattern
-    '#main-content', // common ID
-    '.content-area', // Wordpress-like
-    '.entry-content', // another Wordpress-like
-    '.post-content', // blog/article structure
-    '.page-content', // general CMS style
-    '.gov-main', // sometimes in .gov sites
-    '.body-content', // catchall
-    'body', // fallback: grab everything
-  ];
+/**
+ * In order from most restrictive to least restrictive, HTML selectors that may contain the core content on a page.
+ * The ordering is intentional so the returned value is hopefully the most specific selector, giving the most useful content.
+ */
+const HTML_SELECTORS = [
+  // Most restrictive / semantic
+  'main', // semantic HTML5
+  'article', // common for blog/official docs
+  '.usa-layout-docs__main', // common on US gov sites
+  '.main-content', // common CMS pattern
+  '#main-content', // common ID
+  '.content-area', // Wordpress-like
+  '.entry-content', // another Wordpress-like
+  '.post-content', // blog/article structure
+  '.page-content', // general CMS style
+  '.gov-main', // sometimes in .gov sites
+  '.body-content', // catchall
+  'body', // fallback: grab everything
+];
 
-  for (const selector of selectors) {
+function getCoreContent($: cheerio.CheerioAPI) {
+  for (const selector of HTML_SELECTORS) {
     const text = $(selector).text().replace(/\s+/g, ' ').trim();
     if (text && text.length > 200) {
       // require some minimum length to avoid false hits
@@ -79,7 +83,9 @@ function parseWorksheet(worksheet: ExcelJS.Worksheet) {
 const IGNORED_LINK_TYPES = ['.jpeg', '.jpg', '.png', '.gif', '.docx', '.csv'];
 
 /**
- * View DOI (Digital Object Identifier) information for a dataset
+ * View DOI (Digital Object Identifier) information for a dataset.
+ * The models all seem to use this as a catch-all for any non-dataset resource link.
+ * It's not intentional usage, but I'm adding parsing for other data formats to help them anyways.
  */
 export const doiView = tool(
   async ({ doi }) => {
@@ -96,8 +102,8 @@ export const doiView = tool(
 
     try {
       // Fetch the DOI info using a basic fetch request in the HTML
-      // TODO: use Langchain's built in HTML parsing tool for this?
-      // TODO: add parsing node with separate model call for this tool?
+      // TODO: FUTURE IDEA: use Langchain's built in HTML parsing tool for this?
+      // TODO: FUTURE IDEA: add parsing node with separate model call for this tool?
 
       // 5 second timeout - if the download takes too long, abort it.
       const controller = new AbortController();

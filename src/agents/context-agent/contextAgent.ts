@@ -5,13 +5,13 @@ import {
   START,
   StateGraph,
 } from '@langchain/langgraph';
-import { openai } from '../../llms';
+import { openai } from '@llms';
 import { z } from 'zod';
 import { CONTEXT_AGENT_INITIAL_PROMPT } from './prompts';
-import { DatasetWithEvaluation } from '../../lib/annotation';
-import { getPackage } from '../../lib/data-gov';
-import { doiView } from '../../tools/doiView';
-import { datasetDownload } from '../../tools/datasetDownload';
+import { DatasetWithEvaluation } from '@lib/annotation';
+import { getPackage } from '@lib/data-gov';
+import { doiView } from '@tools/doiView';
+import { datasetDownload } from '@tools/datasetDownload';
 
 const URL_REGEX = /(https?:\/\/[^\s"']+)/g;
 

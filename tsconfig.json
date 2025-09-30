@@ -15,7 +15,16 @@
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
     "allowJs": true,
-    "types": ["bun-types"]
+    "types": ["bun-types"],
+    "paths": {
+      "@lib/*": ["./src/lib/*"],
+      "@agents/*": ["./src/agents/*"],
+      "@tools/*": ["./src/tools/*"],
+      "@llms/*": ["./src/llms/*"],
+      "@llms": ["./src/llms/index.ts"],
+      "@tools": ["./src/tools/index.ts"],
+      "@agents": ["./src/agents/index.ts"]
+    }
   },
   "include": ["src/**/*", "test/**/*"],
   "exclude": ["node_modules", "dist"]

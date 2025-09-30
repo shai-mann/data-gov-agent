@@ -9,12 +9,12 @@ import {
   DatasetSelection,
   DatasetWithEvaluation,
   QueryAgentSummarySchema,
-} from '../../lib/annotation';
+} from '@lib/annotation';
 import { Send } from '@langchain/langgraph';
-import { openai } from '../../llms';
+import { openai } from '@llms';
 import { z } from 'zod';
 import { queryAgent, searchAgent, evalAgent } from '..';
-import { getPackage } from '../../lib/data-gov';
+import { getPackage } from '@lib/data-gov';
 import {
   DATA_GOV_FINAL_EVALUATION_PROMPT,
   DATA_GOV_FINAL_SELECTION_PROMPT,

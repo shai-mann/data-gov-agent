@@ -1,12 +1,12 @@
 import { Hono } from 'hono';
-import { datasetDownload, packageShow } from './tools';
+import { datasetDownload, packageShow } from '@tools';
 import {
   contextAgent,
   coreAgent,
   queryAgent,
   searchAgent,
   shallowEvalAgent,
-} from './agents';
+} from '@agents';
 
 const app = new Hono();
 
