@@ -30,6 +30,8 @@ I'm submitting the separate agents for search, eval, and query, rather than this
 This code still exists so you can see how it would all get stitched together, but the project itself lives in the other agent files.
 */
 
+/* ANNOTATIONS */
+
 /**
  * Main annotation for the gov researcher agent.
  */
@@ -57,11 +59,22 @@ const EvalDatasetAnnotation = Annotation.Root({
   userQuery: Annotation<string>(),
 });
 
+/* MODELS */
+
 const formattingStructuredModel = openai.withStructuredOutput(
   z.object({
     query: z.string(),
   })
 );
+
+const structuredModel = openai.withStructuredOutput(
+  z.object({
+    type: z.literal('dataset').or(z.literal('none')),
+    id: z.string().optional().nullable(),
+  })
+);
+
+/* NODES */
 
 async function userQueryFormattingNode(
   state: typeof GovResearcherAnnotation.State
@@ -131,13 +144,6 @@ async function evalNode(state: typeof EvalDatasetAnnotation.State) {
     evaluatedDatasets: evaluatedDataset,
   };
 }
-
-const structuredModel = openai.withStructuredOutput(
-  z.object({
-    type: z.literal('dataset').or(z.literal('none')),
-    id: z.string().optional().nullable(),
-  })
-);
 
 async function datasetFinalSelectionNode(
   state: typeof GovResearcherAnnotation.State
@@ -227,6 +233,8 @@ async function emitFinalEvaluationNode(
   };
 }
 
+/* EDGES */
+
 async function shouldContinueWithSelection(
   state: typeof GovResearcherAnnotation.State
 ) {
@@ -240,6 +248,7 @@ const graph = new StateGraph(GovResearcherAnnotation)
   .addNode('format', userQueryFormattingNode)
   .addNode('search', searchNode)
   .addNode('eval', evalNode)
+  // Defer the selection node, so all evaluation nodes complete before it runs.
   .addNode('select', datasetFinalSelectionNode, { defer: true })
   .addNode('query', queryNode)
   .addNode('emitOutput', emitFinalEvaluationNode)
