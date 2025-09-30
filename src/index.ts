@@ -4,7 +4,7 @@ import queryAgent from './agents/queryAgent';
 import datasetSearchAgent from './agents/search-agent/searchAgent';
 import shallowEvalAgent from './agents/shallow-eval-agent/shallowEvalAgent';
 import { datasetDownload, packageShow } from './tools';
-import contextAgent from './agents/contextAgent';
+import contextAgent from './agents/context-agent/contextAgent';
 
 const app = new Hono();
 

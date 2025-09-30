@@ -29,7 +29,7 @@ import {
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
-import contextAgent from './contextAgent';
+import contextAgent from './context-agent/contextAgent';
 import { getLastAiMessageIndex, getToolMessages } from '../lib/utils';
 
 // Create a persistent DuckDB connection in memory
