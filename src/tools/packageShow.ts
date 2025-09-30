@@ -12,7 +12,7 @@ export const packageShow = tool(
 
     const { result } = await getPackage(packageId);
 
-    // This is a shortcut for real error handling, but good for an interview project!
+    // This is a shortcut for real error handling, but good enough for an interview project!
     // TODO: replace with real error handling
     const parsedResult = PackageShowSchema.safeParse(result);
 

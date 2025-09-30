@@ -32,7 +32,7 @@ Guidelines:
 export const DATA_GOV_REMINDER_PROMPT = ChatPromptTemplate.fromMessages([
   {
     role: 'system',
-    content: `REMINDER: The user's query is: "{query}". Find 5-10 UNIQUE datasets that are relevant to the user's question. You currently have {datasetCount} datasets selected.
+    content: `REMINDER: The user's query is: "{query}". Find {remainingCount} UNIQUE datasets that are relevant to the user's question.
 
     The datasets you have selected so far are: {datasetIds}.
 

@@ -71,33 +71,31 @@ async function setupNode(state: typeof DatasetSearchAnnotation.State) {
  * Node to call the model to search for datasets.
  */
 async function modelNode(state: typeof DatasetSearchAnnotation.State) {
-  if (state.datasets.length >= MAX_REQUESTED_DATASETS) {
+  const { datasets, userQuery, messages } = state;
+
+  if (datasets.length >= MAX_REQUESTED_DATASETS) {
     console.log(
-      '🔍 [SEARCH] Exiting search workflow (model) - ',
-      state.datasets.length,
-      '/',
-      MAX_REQUESTED_DATASETS,
-      'datasets selected'
+      `🔍 [SEARCH] Found ${datasets.length} datasets, exiting search workflow`
     );
     return {}; // Skip this model call, so the workflow will exit.
   }
 
   console.log(
-    '🔍 [SEARCH] Calling model... currently has',
-    state.datasets.length,
-    'dataset selections'
+    `🔍 [SEARCH] Calling model... currently has ${datasets.length} dataset selections`
   );
 
   const reminderPrompt = await DATA_GOV_REMINDER_PROMPT.formatMessages({
-    query: state.userQuery,
-    datasetCount: state.datasets.length,
-    datasetIds: state.datasets.map(d => d.id).join(', '),
+    query: userQuery,
+    remainingCount: MAX_REQUESTED_DATASETS - datasets.length,
+    datasetIds: datasets.map(d => d.id).join(', '),
   });
 
-  const result = await model.invoke([...state.messages, ...reminderPrompt]);
+  const result = await model.invoke([...messages, ...reminderPrompt]);
 
   return {
     messages: result,
+    // Clear the pending datasets, as they have been processed.
+    pendingDatasets: [],
   };
 }
 
@@ -106,7 +104,7 @@ async function modelNode(state: typeof DatasetSearchAnnotation.State) {
  */
 async function postToolsNode(state: typeof DatasetSearchAnnotation.State) {
   console.log('⚖️ [SEARCH] Tool post-processing Node');
-  const { messages } = state;
+  const { messages, datasets } = state;
 
   // Since it could be a batch of tool calls, we need to find all tool calls since the last AI message
   const lastAiMessageIndex = getLastAiMessageIndex(messages);
@@ -122,7 +120,9 @@ async function postToolsNode(state: typeof DatasetSearchAnnotation.State) {
   const packageSearchDatasetIds = packageSearchToolMessages
     .map(p => z.array(z.object({ id: z.string() })).parse(p.results))
     .map(m => m.map(r => r.id))
-    .flat();
+    .flat()
+    // Filter out the datasets that have already been selected.
+    .filter(id => !datasets.some(d => d.id === id));
 
   return { pendingDatasets: packageSearchDatasetIds };
 }
@@ -131,12 +131,7 @@ async function postToolsNode(state: typeof DatasetSearchAnnotation.State) {
  * Node to shallowly evaluate a dataset.
  */
 async function shallowEvalNode(state: typeof EvalDatasetAnnotation.State) {
-  const { datasetId, userQuery, datasets } = state;
-
-  // Skip if the dataset is already in the state.
-  if (datasets.some(d => d.id === datasetId)) {
-    return {};
-  }
+  const { datasetId, userQuery } = state;
 
   const dataset = await packageShow.invoke({
     packageId: datasetId,

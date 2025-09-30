@@ -50,6 +50,12 @@ export const PackageShowSchema = z.object({
       description: z.string(),
     })
   ),
+  extras: z.array(
+    z.object({
+      key: z.string(),
+      value: z.string(),
+    })
+  ),
 });
 
 export type PackageShowResponse = z.infer<typeof PackageShowSchema>;
