@@ -11,7 +11,7 @@ import {
   QueryAgentSummarySchema,
 } from '../../lib/annotation';
 import { Send } from '@langchain/langgraph';
-import searchAgent from '../searchAgent';
+import searchAgent from '../search-agent/searchAgent';
 import evalAgent from '../evalAgent';
 import { openai } from '../../llms';
 import { z } from 'zod';

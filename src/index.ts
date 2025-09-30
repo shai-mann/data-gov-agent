@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import dataGovAgent from './agents/core-agent/coreAgent';
 import queryAgent from './agents/queryAgent';
-import datasetSearchAgent from './agents/searchAgent';
+import datasetSearchAgent from './agents/search-agent/searchAgent';
 import shallowEvalAgent from './agents/shallowEvalAgent';
 import { datasetDownload, packageShow } from './tools';
 import contextAgent from './agents/contextAgent';

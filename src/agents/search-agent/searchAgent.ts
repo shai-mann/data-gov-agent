@@ -7,21 +7,18 @@ import {
   StateGraph,
 } from '@langchain/langgraph';
 import { ToolNode } from '@langchain/langgraph/prebuilt';
-import { packageSearch, packageNameSearch, packageShow } from '../tools';
-import { openai } from '../llms';
-import {
-  DATA_GOV_REMINDER_PROMPT,
-  DATA_GOV_SEARCH_PROMPT,
-} from '../lib/prompts';
-import { DatasetSelection } from '../lib/annotation';
-import { getLastAiMessageIndex, getToolMessages } from '../lib/utils';
+import { packageSearch, packageNameSearch, packageShow } from '../../tools';
+import { openai } from '../../llms';
+import { DATA_GOV_REMINDER_PROMPT, DATA_GOV_SEARCH_PROMPT } from './prompts';
+import { DatasetSelection } from '../../lib/annotation';
+import { getLastAiMessageIndex, getToolMessages } from '../../lib/utils';
 import { z } from 'zod';
-import shallowEvalAgent from './shallowEvalAgent';
+import shallowEvalAgent from '../shallowEvalAgent';
 
 // It can return with fewer than this (it's asked for 4-5), but this is a backstop to prevent recursion caps from being hit.
 const MAX_REQUESTED_DATASETS = 5;
 
-// State annotation for the dataset selection workflow
+// State annotation for the dataset searching workflow
 const DatasetSearchAnnotation = Annotation.Root({
   ...MessagesAnnotation.spec,
   datasets: Annotation<DatasetSelection[]>({
@@ -41,10 +38,17 @@ const EvalDatasetAnnotation = Annotation.Root({
   datasets: Annotation<DatasetSelection[]>(),
 });
 
+/* MODELS */
+
 const tools = [packageSearch, packageNameSearch];
 
 const model = openai.bindTools(tools);
 
+/* NODES */
+
+/**
+ * Node to setup the dataset searching agent.
+ */
 async function setupNode(state: typeof DatasetSearchAnnotation.State) {
   const { userQuery } = state;
 
@@ -63,6 +67,9 @@ async function setupNode(state: typeof DatasetSearchAnnotation.State) {
   };
 }
 
+/**
+ * Node to call the model to search for datasets.
+ */
 async function modelNode(state: typeof DatasetSearchAnnotation.State) {
   if (state.datasets.length >= MAX_REQUESTED_DATASETS) {
     console.log(
@@ -94,7 +101,9 @@ async function modelNode(state: typeof DatasetSearchAnnotation.State) {
   };
 }
 
-// Middle node to process calls from tools and perform additional post-processing
+/**
+ * Node to process calls from tools and perform additional post-processing.
+ */
 async function postToolsNode(state: typeof DatasetSearchAnnotation.State) {
   console.log('⚖️ [SEARCH] Tool post-processing Node');
   const { messages } = state;
@@ -118,6 +127,9 @@ async function postToolsNode(state: typeof DatasetSearchAnnotation.State) {
   return { pendingDatasets: packageSearchDatasetIds };
 }
 
+/**
+ * Node to shallowly evaluate a dataset.
+ */
 async function shallowEvalNode(state: typeof EvalDatasetAnnotation.State) {
   const { datasetId, userQuery, datasets } = state;
 
@@ -150,6 +162,12 @@ async function shallowEvalNode(state: typeof EvalDatasetAnnotation.State) {
   return { datasets: datasetSelection };
 }
 
+/* EDGES */
+
+/**
+ * Conditional edge to route from post-tools node either to the model or to the end,
+ * depending on whether the AI has found enough datasets
+ */
 function shouldContinueToTools(state: typeof DatasetSearchAnnotation.State) {
   const { messages } = state;
   const lastMessage = messages[messages.length - 1];
@@ -168,7 +186,10 @@ function shouldContinueToTools(state: typeof DatasetSearchAnnotation.State) {
   return END;
 }
 
-// Conditional edge to route from post-tools node either to the model or to the end, depending on whether the AI has found enough datasets
+/**
+ * Conditional edge to route from post-tools node either to the model or to the end,
+ * depending on whether the AI has found enough datasets
+ */
 function shouldContinueToModel(state: typeof DatasetSearchAnnotation.State) {
   const { datasets } = state;
 
@@ -180,6 +201,10 @@ function shouldContinueToModel(state: typeof DatasetSearchAnnotation.State) {
   return 'model';
 }
 
+/**
+ * Conditional edge to route from post-tools node either to the shallow eval (as fan-out) or to the model,
+ * depending on whether there are any pending datasets
+ */
 function shouldContinueToEval(state: typeof DatasetSearchAnnotation.State) {
   const { pendingDatasets, userQuery, datasets } = state;
   if (pendingDatasets.length === 0) {
@@ -197,9 +222,9 @@ function shouldContinueToEval(state: typeof DatasetSearchAnnotation.State) {
   );
 }
 
-// Build the data-gov agent workflow
 const graph = new StateGraph(DatasetSearchAnnotation)
   .addNode('setup', setupNode)
+  // Defer the model node, so the shallow eval nodes are forced to fan-in before it runs.
   .addNode('model', modelNode, { defer: true })
   .addNode('tools', new ToolNode(tools))
   .addNode('postTools', postToolsNode)
