@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { ONE_SECOND } from '../lib/utils';
 
 // TODO: This is a hack to store the dataset in memory so we don't have to download it multiple times
-const workingDatasetMemory: Record<string, string[]> = {};
+export const workingDatasetMemory: Record<string, string[]> = {};
 
 /**
  * Download and preview a dataset from data.gov (first 100 rows)

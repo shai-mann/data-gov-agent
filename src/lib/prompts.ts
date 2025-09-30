@@ -272,6 +272,7 @@ export const QUERY_AGENT_SQL_QUERY_PROMPT = ChatPromptTemplate.fromMessages([
 
 ### Tools:
 - sqlQuery: Run a SQL query against the dataset. IMPORTANT: This tool only accepts valid SQL queries.
+    *NOTE*: Leave the limitOutput parameter set to true until you are testing or running the final query. The limit is there to restrict the OUTPUT size, not the database query itself.
 - packageShow: View dataset metadata, including schema and links to additional resources.
 - datasetDownload: Preview a small sample of the dataset (try to restrict to the first 20 rows).
     *NOTE*: The first row returned is always the column headers.
@@ -324,6 +325,8 @@ export const QUERY_AGENT_SQL_REMINDER_PROMPT = ChatPromptTemplate.fromMessages([
 - SELECT col1, col2 LIMIT 20 (to inspect columns together)
 
 Use these to learn, then refine into the final query. Never re-run the same query, and never use mutation queries — only SELECT.
+
+THEREFORE: Look at the message history, see what queries have been executed, and plan your next query accordingly.
 `,
   },
 ]);

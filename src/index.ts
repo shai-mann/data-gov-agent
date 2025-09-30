@@ -3,7 +3,7 @@ import dataGovAgent from './agents/dataGovAgent';
 import queryAgent from './agents/queryAgent';
 import datasetSearchAgent from './agents/searchAgent';
 import shallowEvalAgent from './agents/shallowEvalAgent';
-import { packageShow } from './tools';
+import { datasetDownload, packageShow } from './tools';
 
 const app = new Hono();
 
@@ -114,6 +114,11 @@ v1.post('/test/query', async c => {
     if (!query || !dataset) {
       return c.json({ error: 'Query and dataset are required' }, 400);
     }
+
+    // Pre-fetch the dataset
+    await datasetDownload.invoke({
+      resourceUrl: dataset.evaluation.bestResource,
+    });
 
     const result = await queryAgent.invoke(
       {

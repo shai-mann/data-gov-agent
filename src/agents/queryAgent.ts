@@ -22,6 +22,10 @@ import { AIMessage } from '@langchain/core/messages';
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import { DuckDBInstance } from '@duckdb/node-api';
+import { workingDatasetMemory } from '../tools/datasetDownload';
+import path from 'path';
+import fs from 'fs';
+import os from 'os';
 
 // Create a persistent DuckDB connection in memory
 const instance = await DuckDBInstance.create(':memory:');
@@ -29,9 +33,14 @@ const conn = await instance.connect();
 
 /* Inline tools - since they need the db connection */
 const sqlQueryTool = tool(
-  async ({ query }) => {
+  async ({ query, limitOutput = true }) => {
     try {
-      console.log('🔍 [QUERY] Executing query: "', query, '"');
+      console.log(
+        '🔍 [QUERY] Executing query: "',
+        query,
+        '"',
+        limitOutput ? 'with limit' : 'WITHOUT limit'
+      );
       const result = await conn.runAndReadAll(query);
 
       // Create column metadata
@@ -43,9 +52,11 @@ const sqlQueryTool = tool(
       });
 
       const output = JSON.stringify({
-        rows: result.getRowObjectsJson(),
+        rows: result.getRowObjectsJson().slice(0, limitOutput ? 10 : undefined),
         columns,
       });
+
+      console.log('🎉 [QUERY] Returned ', output.length, ' characters');
 
       return output;
     } catch (err) {
@@ -58,6 +69,13 @@ const sqlQueryTool = tool(
     description: `Execute a SQL query against the loaded DuckDB tables. Input should be a SQL string.`,
     schema: z.object({
       query: z.string().describe('The SQL query to execute'),
+      limitOutput: z
+        .boolean()
+        .optional()
+        .default(true)
+        .describe(
+          'Whether to limit the output of the query. Default is true. NEVER use this limit for a query you expect to be final.'
+        ),
     }),
   }
 );
@@ -104,11 +122,19 @@ async function setupNode(state: typeof DatasetEvalAnnotation.State) {
     })
   );
 
+  // Fetch the dataset (re-using the tool will result in using the cached data, since it must have been checked already)
+  const csvDataset =
+    workingDatasetMemory[dataset.evaluation.bestResource].join('\n');
+
+  // Write to a temp file
+  const tmpPath = path.join(os.tmpdir(), `tmp_${Date.now()}.csv`);
+  fs.writeFileSync(tmpPath, csvDataset, 'utf8');
+
   // Construct the table in DuckDB and load the dataset into it
   try {
     console.log('🔍 [QUERY] Creating table:', table);
     await conn.run(
-      `CREATE OR REPLACE TABLE ${table} AS SELECT * FROM read_csv_auto('${dataset.evaluation.bestResource}')`
+      `CREATE TABLE ${table} AS SELECT * FROM read_csv_auto('${tmpPath}')`
     );
   } catch (err: unknown) {
     throw new Error(
