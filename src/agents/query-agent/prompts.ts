@@ -1,20 +1,5 @@
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 
-export const PARSE_DATASET_PROMPT = ChatPromptTemplate.fromMessages([
-  {
-    role: 'system',
-    content: `You are a data extraction assistant. Based on the conversation below where a data.gov assistant found and evaluated datasets, extract the information about the list of 5-10 selected datasets that the assistant determined may be suitable for the user's query.
-
-Look through the conversation and identify:
-- Which datasets were ultimately selected as potentially suitable
-- The dataset's metadata (ID, title, organization, etc.)
-- The reasoning for why it was selected
-- Any download or access information
-
-Extract this into the structured format requested.`,
-  },
-]);
-
 export const QUERY_AGENT_TABLE_NAME_PROMPT = ChatPromptTemplate.fromMessages([
   {
     role: 'system',

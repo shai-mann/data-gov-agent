@@ -11,83 +11,31 @@ import {
   QUERY_AGENT_SQL_QUERY_PROMPT,
   QUERY_AGENT_SQL_REMINDER_PROMPT,
   QUERY_AGENT_TABLE_NAME_PROMPT,
-} from '../lib/prompts';
+} from './prompts';
 import {
   DatasetWithEvaluation,
   QueryAgentSummarySchema,
-} from '../lib/annotation';
-import { openai } from '../llms';
+} from '../../lib/annotation';
+import { openai } from '../../llms';
 import { ToolNode } from '@langchain/langgraph/prebuilt';
 import { AIMessage } from '@langchain/core/messages';
-import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
-import { DuckDBInstance } from '@duckdb/node-api';
 import {
   datasetDownload,
   workingDatasetMemory,
-} from '../tools/datasetDownload';
+} from '../../tools/datasetDownload';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
-import contextAgent from './context-agent/contextAgent';
-import { getLastAiMessageIndex, getToolMessages } from '../lib/utils';
-
-// Create a persistent DuckDB connection in memory
-const instance = await DuckDBInstance.create(':memory:');
-const conn = await instance.connect();
-
-/* Inline tools - since they need the db connection */
-const sqlQueryTool = tool(
-  async ({ query, limit = 10 }) => {
-    try {
-      console.log(
-        '🔍 [QUERY] Executing query: "',
-        query,
-        '" with limit ',
-        limit
-      );
-      const result = await conn.runAndReadAll(query);
-
-      // Create column metadata
-      const columns = result.columnNames().map((c, i) => {
-        return {
-          name: c,
-          type: result.columnType(i),
-        };
-      });
-
-      const output = JSON.stringify({
-        rows: result.getRowObjectsJson().slice(0, limit),
-        columns,
-      });
-
-      console.log('🎉 [QUERY] Returned ', output.length, ' characters');
-
-      return { success: true, output };
-    } catch (err) {
-      console.error('🔍 [QUERY] Error executing query: ', err);
-      return `Error executing query: ${err instanceof Error ? err.message : 'Unknown'}`;
-    }
-  },
-  {
-    name: 'sqlQuery',
-    description: `Execute a SQL query against the loaded DuckDB tables. Input should be a SQL string.`,
-    schema: z.object({
-      query: z.string().describe('The SQL query to execute'),
-      limit: z
-        .number()
-        .optional()
-        .default(10)
-        .describe(
-          'The number of rows to limit the output of the query to. Default is 10. Use a limit like 10 or 20 for all queries except the final query.'
-        ),
-    }),
-  }
-);
+import contextAgent from '../context-agent/contextAgent';
+import { getLastAiMessageIndex, getToolMessages } from '../../lib/utils';
+import { conn } from '../../lib/duckdb';
+import { sqlQueryTool } from '../../tools';
 
 const MAX_QUERY_COUNT = 10;
 
-// State annotation for the dataset evaluation workflow
+/* ANNOTATIONS */
+
 const DatasetEvalAnnotation = Annotation.Root({
   ...MessagesAnnotation.spec,
   dataset: Annotation<DatasetWithEvaluation>,
@@ -101,6 +49,8 @@ const DatasetEvalAnnotation = Annotation.Root({
   sqlQuery: Annotation<string>,
   summary: Annotation<z.infer<typeof QueryAgentSummarySchema>>,
 });
+
+/* MODELS */
 
 const tools = [sqlQueryTool];
 
@@ -117,8 +67,11 @@ const tableNameStructuredModel = openai.withStructuredOutput(
   })
 );
 
-/* QUERYING WORKFLOW */
+/* NODES */
 
+/**
+ * Handles initializing the "database" (with DuckDB, in-mem), creating the table and populating it, and providing a preview of the dataset.
+ */
 async function setupNode(state: typeof DatasetEvalAnnotation.State) {
   const { dataset } = state;
 
@@ -167,6 +120,9 @@ async function setupNode(state: typeof DatasetEvalAnnotation.State) {
   };
 }
 
+/**
+ * Invokes the context agent to generate a context prompt for the model before it iterates.
+ */
 async function contextNode(state: typeof DatasetEvalAnnotation.State) {
   const { dataset, preview, tableName, userQuery } = state;
 
@@ -188,7 +144,6 @@ async function contextNode(state: typeof DatasetEvalAnnotation.State) {
   };
 }
 
-// Core evaluation prompt (evaluates a single dataset in the context of the user query)
 async function modelNode(state: typeof DatasetEvalAnnotation.State) {
   console.log('🔍 [QUERY] Evaluating...');
 
@@ -212,6 +167,9 @@ async function modelNode(state: typeof DatasetEvalAnnotation.State) {
   };
 }
 
+/**
+ * Updates the query count after the SQL query tool is used.
+ */
 async function postToolNode(state: typeof DatasetEvalAnnotation.State) {
   const { messages, queryCount } = state;
 
@@ -232,6 +190,10 @@ async function postToolNode(state: typeof DatasetEvalAnnotation.State) {
   };
 }
 
+/**
+ * Evaluates the last query and provides feedback on what could be improved for the next query.
+ * Splitting this apart from the generation model allows a much stronger plan-then-execute approach for the agent.
+ */
 async function evaluateQueryNode(state: typeof DatasetEvalAnnotation.State) {
   const { messages, userQuery, tableName, preview, queryCount } = state;
   const lastMessageIndex = getLastAiMessageIndex(messages);
@@ -257,6 +219,9 @@ async function evaluateQueryNode(state: typeof DatasetEvalAnnotation.State) {
   };
 }
 
+/**
+ * Formulate a structured output including summary, table, and queries.
+ */
 async function outputNode(state: typeof DatasetEvalAnnotation.State) {
   console.log('🔍 [EVAL] Structuring output...');
 
@@ -274,6 +239,8 @@ async function outputNode(state: typeof DatasetEvalAnnotation.State) {
     summary,
   };
 }
+
+/* EDGES */
 
 function shouldContinue(state: typeof DatasetEvalAnnotation.State) {
   const messages = state.messages;
