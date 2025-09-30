@@ -16,17 +16,21 @@ import {
   QueryAgentSummarySchema,
 } from '../lib/annotation';
 import { openai } from '../llms';
-import { datasetDownload, doiView, packageShow } from '../tools';
 import { ToolNode } from '@langchain/langgraph/prebuilt';
 import { AIMessage } from '@langchain/core/messages';
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import { DuckDBInstance } from '@duckdb/node-api';
-import { workingDatasetMemory } from '../tools/datasetDownload';
+import {
+  datasetDownload,
+  workingDatasetMemory,
+} from '../tools/datasetDownload';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import contextAgent from './contextAgent';
+import { getLastAiMessageIndex, getToolMessages } from '../lib/utils';
+import { MOCK_CONTEXT_SUMMARY } from './helpers/mock-datasets';
 
 // Create a persistent DuckDB connection in memory
 const instance = await DuckDBInstance.create(':memory:');
@@ -34,13 +38,13 @@ const conn = await instance.connect();
 
 /* Inline tools - since they need the db connection */
 const sqlQueryTool = tool(
-  async ({ query, limitOutput = true }) => {
+  async ({ query, limit = 10 }) => {
     try {
       console.log(
         '🔍 [QUERY] Executing query: "',
         query,
-        '"',
-        limitOutput ? 'with limit' : 'WITHOUT limit'
+        '" with limit ',
+        limit
       );
       const result = await conn.runAndReadAll(query);
 
@@ -53,13 +57,13 @@ const sqlQueryTool = tool(
       });
 
       const output = JSON.stringify({
-        rows: result.getRowObjectsJson().slice(0, limitOutput ? 10 : undefined),
+        rows: result.getRowObjectsJson().slice(0, limit),
         columns,
       });
 
       console.log('🎉 [QUERY] Returned ', output.length, ' characters');
 
-      return output;
+      return { success: true, output };
     } catch (err) {
       console.error('🔍 [QUERY] Error executing query: ', err);
       return `Error executing query: ${err instanceof Error ? err.message : 'Unknown'}`;
@@ -70,29 +74,35 @@ const sqlQueryTool = tool(
     description: `Execute a SQL query against the loaded DuckDB tables. Input should be a SQL string.`,
     schema: z.object({
       query: z.string().describe('The SQL query to execute'),
-      limitOutput: z
-        .boolean()
+      limit: z
+        .number()
         .optional()
-        .default(true)
+        .default(10)
         .describe(
-          'Whether to limit the output of the query. Default is true. NEVER use this limit for a query you expect to be final.'
+          'The number of rows to limit the output of the query to. Default is 10. Use a limit like 10 or 20 for all queries except the final query.'
         ),
     }),
   }
 );
 
+const MAX_QUERY_COUNT = 10;
+
 // State annotation for the dataset evaluation workflow
 const DatasetEvalAnnotation = Annotation.Root({
   ...MessagesAnnotation.spec,
   dataset: Annotation<DatasetWithEvaluation>,
-  datasetLink: Annotation<string>,
+  queryCount: Annotation<number>({
+    default: () => 0,
+    reducer: (cur, val) => cur + val,
+  }),
   tableName: Annotation<string>,
+  preview: Annotation<string[]>,
   userQuery: Annotation<string>,
   sqlQuery: Annotation<string>,
   summary: Annotation<z.infer<typeof QueryAgentSummarySchema>>,
 });
 
-const tools = [packageShow, datasetDownload, doiView, sqlQueryTool];
+const tools = [sqlQueryTool];
 
 const model = openai.bindTools(tools);
 const structuredModel = openai.withStructuredOutput(QueryAgentSummarySchema);
@@ -145,27 +155,34 @@ async function setupNode(state: typeof DatasetEvalAnnotation.State) {
     );
   }
 
+  const { preview } = await datasetDownload.invoke({
+    resourceUrl: dataset.evaluation.bestResource,
+    limit: 20,
+    offset: 0,
+  });
+
   return {
-    datasetLink: dataset.evaluation.bestResource,
     tableName: table,
+    preview,
   };
 }
 
 async function contextNode(state: typeof DatasetEvalAnnotation.State) {
-  const { dataset, datasetLink, tableName, userQuery } = state;
+  const { dataset, preview, tableName, userQuery } = state;
 
   // Call the context agent
-  const { summary } = await contextAgent.invoke({
-    dataset,
-  });
+  // const { summary } = await contextAgent.invoke({
+  //   dataset,
+  // });
+
+  const summary = MOCK_CONTEXT_SUMMARY;
 
   // Construct the prompt for the model, including the context from the context agent
   const prompt = await QUERY_AGENT_SQL_QUERY_PROMPT.formatMessages({
     tableName,
     query: userQuery,
     context: summary,
-    datasetLink,
-    datasetId: dataset.id,
+    preview: preview.join('\n'),
   });
 
   return {
@@ -177,12 +194,45 @@ async function contextNode(state: typeof DatasetEvalAnnotation.State) {
 async function modelNode(state: typeof DatasetEvalAnnotation.State) {
   console.log('🔍 [QUERY] Evaluating...');
 
-  const prompt = await QUERY_AGENT_SQL_REMINDER_PROMPT.formatMessages({});
+  if (state.queryCount >= MAX_QUERY_COUNT) {
+    console.log(
+      '🔍 [QUERY] Exiting workflow (model) - query count is at: ',
+      state.queryCount
+    );
+    return {}; // Skip this model call, so the workflow will exit.
+  }
+
+  const prompt = await QUERY_AGENT_SQL_REMINDER_PROMPT.formatMessages({
+    executedCount: state.queryCount,
+    remainingCount: MAX_QUERY_COUNT - state.queryCount,
+  });
 
   const result = await model.invoke([...state.messages, ...prompt]);
 
   return {
     messages: result,
+  };
+}
+
+async function postToolNode(state: typeof DatasetEvalAnnotation.State) {
+  const { messages, queryCount } = state;
+
+  const sqlQueryToolMessages = getToolMessages(
+    messages,
+    'sqlQuery',
+    getLastAiMessageIndex(messages) + 1
+  );
+
+  console.log('SQL QUERY TOOL MESSAGES: ', sqlQueryToolMessages);
+
+  console.log(
+    '🔍 [QUERY] Post-tool node, query count is now at: ',
+    queryCount + sqlQueryToolMessages.length
+  );
+
+  return {
+    // Because of the reducer, this is additive
+    queryCount: sqlQueryToolMessages.length,
   };
 }
 
@@ -225,13 +275,15 @@ const graph = new StateGraph(DatasetEvalAnnotation)
   .addNode('context', contextNode)
   .addNode('model', modelNode)
   .addNode('toolNode', new ToolNode(tools))
+  .addNode('postTool', postToolNode)
   .addNode('output', outputNode)
 
   .addEdge(START, 'setup')
   .addEdge('setup', 'context')
   .addEdge('context', 'model')
   .addConditionalEdges('model', shouldContinue, ['toolNode', 'output'])
-  .addEdge('toolNode', 'model')
+  .addEdge('toolNode', 'postTool')
+  .addEdge('postTool', 'model')
   .addEdge('output', END)
   .compile();
 
