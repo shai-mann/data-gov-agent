@@ -177,6 +177,7 @@ async function queryNode(state: typeof DataGovAnnotation.State) {
     userQuery,
   });
 
+  console.log('🔍 [CORE] Exiting workflow');
   return {
     summary,
   };
