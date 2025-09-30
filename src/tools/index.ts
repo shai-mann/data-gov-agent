@@ -1,4 +1,3 @@
-export { add } from './add';
 export { packageSearch } from './packageSearch';
 export { packageNameSearch } from './packageNameSearch';
 export { packageShow } from './packageShow';
