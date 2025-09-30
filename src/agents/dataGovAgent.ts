@@ -91,6 +91,11 @@ async function searchNode(state: typeof DataGovAnnotation.State) {
 function continueToEval(state: typeof DataGovAnnotation.State) {
   const { datasets, userQuery } = state;
 
+  console.log(
+    '🔍 [CORE] Kicking off evaluation for',
+    datasets.length,
+    'datasets'
+  );
   return datasets.map(dataset => new Send('eval', { dataset, userQuery }));
 }
 

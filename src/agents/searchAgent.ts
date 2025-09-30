@@ -66,7 +66,11 @@ async function setupNode(state: typeof DatasetSearchAnnotation.State) {
 async function modelNode(state: typeof DatasetSearchAnnotation.State) {
   if (state.datasets.length >= MAX_REQUESTED_DATASETS) {
     console.log(
-      '🔍 [SEARCH] Exiting search workflow (model) - reached max requested datasets'
+      '🔍 [SEARCH] Exiting search workflow (model) - ',
+      state.datasets.length,
+      '/',
+      MAX_REQUESTED_DATASETS,
+      'datasets selected'
     );
     return {}; // Skip this model call, so the workflow will exit.
   }
