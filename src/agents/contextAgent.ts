@@ -23,7 +23,7 @@ const ContextAgentAnnotation = Annotation.Root({
 });
 
 const structuredModel = openai.withStructuredOutput(
-  z.object({ summary: z.string().url() })
+  z.object({ summary: z.string() })
 );
 
 async function setupNode(state: typeof ContextAgentAnnotation.State) {

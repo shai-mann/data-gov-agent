@@ -118,8 +118,7 @@ v1.post('/test/context', async c => {
 
     return c.json({
       success: true,
-      result: result.summary,
-      messages: result.messages,
+      ...result,
     });
   } catch (error) {
     console.error('Context Agent error:', error);
