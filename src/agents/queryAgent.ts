@@ -6,6 +6,7 @@ import {
   StateGraph,
 } from '@langchain/langgraph';
 import {
+  QUERY_AGENT_EVALUATE_QUERY_PROMPT,
   QUERY_AGENT_SQL_QUERY_OUTPUT_PROMPT,
   QUERY_AGENT_SQL_QUERY_PROMPT,
   QUERY_AGENT_SQL_REMINDER_PROMPT,
@@ -223,8 +224,6 @@ async function postToolNode(state: typeof DatasetEvalAnnotation.State) {
     getLastAiMessageIndex(messages) + 1
   );
 
-  console.log('SQL QUERY TOOL MESSAGES: ', sqlQueryToolMessages);
-
   console.log(
     '🔍 [QUERY] Post-tool node, query count is now at: ',
     queryCount + sqlQueryToolMessages.length
@@ -233,6 +232,31 @@ async function postToolNode(state: typeof DatasetEvalAnnotation.State) {
   return {
     // Because of the reducer, this is additive
     queryCount: sqlQueryToolMessages.length,
+  };
+}
+
+async function evaluateQueryNode(state: typeof DatasetEvalAnnotation.State) {
+  const { messages, userQuery, tableName, preview, queryCount } = state;
+  const lastMessageIndex = getLastAiMessageIndex(messages);
+
+  const history = messages.slice(lastMessageIndex);
+
+  const prompt = await QUERY_AGENT_EVALUATE_QUERY_PROMPT.formatMessages({
+    userQuery,
+    tableName,
+    preview: preview.join('\n'),
+    remainingQueryCount: MAX_QUERY_COUNT - queryCount,
+  });
+
+  console.log('🔍 [QUERY] Evaluating last query...');
+
+  // Not using the model with tools here because it shouldn't use any tools.
+  const result = await openai.invoke([...history, ...prompt]);
+
+  console.log('🔍 [QUERY] Evaluated query: ', result.content);
+
+  return {
+    messages: result,
   };
 }
 
@@ -276,6 +300,7 @@ const graph = new StateGraph(DatasetEvalAnnotation)
   .addNode('model', modelNode)
   .addNode('toolNode', new ToolNode(tools))
   .addNode('postTool', postToolNode)
+  .addNode('evaluateQuery', evaluateQueryNode)
   .addNode('output', outputNode)
 
   .addEdge(START, 'setup')
@@ -283,7 +308,8 @@ const graph = new StateGraph(DatasetEvalAnnotation)
   .addEdge('context', 'model')
   .addConditionalEdges('model', shouldContinue, ['toolNode', 'output'])
   .addEdge('toolNode', 'postTool')
-  .addEdge('postTool', 'model')
+  .addEdge('postTool', 'evaluateQuery')
+  .addEdge('evaluateQuery', 'model')
   .addEdge('output', END)
   .compile();
 
