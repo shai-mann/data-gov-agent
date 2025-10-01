@@ -1,22 +1,5 @@
 import { z } from 'zod';
 
-// TODO: phase out this data type... it's re-used everywhere in different ways.
-export type DatasetSelection = { id: string; title: string; reason: string };
-
-export type DatasetWithEvaluation = DatasetSelection & {
-  // Optional because it may not have been evaluated yet
-  evaluation?:
-    | {
-        usable: true;
-        score: number;
-        reasoning: string;
-        bestResource: string;
-      }
-    | {
-        usable: false;
-      };
-};
-
 export const DatasetWithEvaluationSchema = z.object({
   id: z.string(),
   title: z.string(),
