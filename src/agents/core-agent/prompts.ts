@@ -90,8 +90,8 @@ export const DATA_GOV_FINAL_EVALUATION_PROMPT = ChatPromptTemplate.fromMessages(
 
       The summary is: {summary}
 
-      ### The Final Dataset
-      The final dataset is: {finalDataset}
+      ### The Dataset
+      The dataset is: {dataset}
 
       ### The Full Package Metadata
       The full package metadata is: {fullPackage}

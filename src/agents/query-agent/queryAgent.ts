@@ -26,7 +26,7 @@ import { conn, workingDatasetMemory } from '@lib/database';
 import { sqlQueryTool } from '@tools';
 import { DatasetWithEvaluation } from '@agents/search-agent/searchAgent';
 
-const MAX_QUERY_COUNT = 10;
+const MAX_QUERY_COUNT = 5;
 
 /* ANNOTATIONS */
 

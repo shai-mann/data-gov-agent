@@ -17,6 +17,7 @@ import {
 import { DatasetWithEvaluation } from '@agents/search-agent/searchAgent';
 
 /*
+// TODO: Follow up on this comment - do I still need it?
 NOTE: This **was** a core agent (running exactly as you see below), but due to token limitations (20k tokens/min for my account),
 I'm submitting the separate agents for search, eval, and query, rather than this full combined agent.
 
@@ -83,10 +84,15 @@ async function queryNode(state: typeof GovResearcherAnnotation.State) {
     throw new Error('[CORE] No dataset selected at querying node');
   }
 
-  const { summary } = await queryAgent.invoke({
-    dataset,
-    userQuery,
-  });
+  const { summary } = await queryAgent.invoke(
+    {
+      dataset,
+      userQuery,
+    },
+    {
+      recursionLimit: 30, // Query agent often needs some extra iterations
+    }
+  );
 
   console.log('🔍 [CORE] Exiting workflow');
   return {
