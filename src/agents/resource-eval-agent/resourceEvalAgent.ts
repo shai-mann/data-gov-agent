@@ -113,7 +113,7 @@ async function deepEvalNode(state: typeof ResourceEvaluationAnnotation.State) {
     }
   }
 
-  preview = preview?.slice(0, 4000); // safety: prevent token explosion
+  preview = preview?.slice(0, 1000); // safety: prevent token explosion
 
   const prompt = await DATA_GOV_DEEP_EVAL_SINGLE_RESOURCE_PROMPT.formatMessages(
     {
@@ -147,11 +147,14 @@ async function shouldPerformDeepEvalEdge(
 const graph = new StateGraph(ResourceEvaluationAnnotation)
   .addNode('evaluateResource', evaluateResourceNode)
   .addNode('deepEval', deepEvalNode)
+
   .addEdge(START, 'evaluateResource')
   .addConditionalEdges('evaluateResource', shouldPerformDeepEvalEdge, [
     'deepEval',
     END,
   ])
+  .addEdge('deepEval', END)
+
   .compile();
 
 export default graph;

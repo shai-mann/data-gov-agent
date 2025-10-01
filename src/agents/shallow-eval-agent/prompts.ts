@@ -19,6 +19,10 @@ export const DATA_GOV_SHALLOW_EVAL_SUMMATIVE_PROMPT =
 
       ### Important Notes
       - A primary resource can only be a CSV file.
+      - When examining the resource evaluations, pay careful attention for the following pattern:
+        1. A good primary resource says that it may be usable, if added information X or Y exists.
+        2. No other resource seems to be able to provide X or Y.
+        CONCLUSION: It is VITAL that any "added information" that the primary resource's evaluation requests is provided by a resource listed in the secondaryResources array.
 
       The user's question is: {userQuery}
 

@@ -52,7 +52,7 @@ Output format (must be valid JSON):
   "summary": "<1-2 paragraph natural-language summary>",
   "usable": true|false,
   "usability_reason": "<one-sentence explanation why usable is true/false>",
-  "columns": [
+  "columns": [ // Only include columns that are useful for the question!
     {{
       "name": "<exact column name inferred>",
       "inferred_type": "<integer|float|string|date|boolean|unknown>",

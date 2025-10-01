@@ -170,6 +170,20 @@ async function trySelectNode(state: typeof DatasetSearchAnnotation.State) {
   // we can re-use the list to find all the new evaluations, to provide to the model.
   const newDatasets = datasets.filter(d => pendingDatasets.includes(d.id));
 
+  if (newDatasets.length === 0) {
+    console.log('🔍 [SEARCH] No datasets to evaluate, skipping selection');
+    return {
+      selectedDataset: null,
+      pendingDatasets: [],
+    };
+  }
+
+  console.log(
+    '🔍 [SEARCH] Attempting to select new dataset from',
+    newDatasets.length,
+    'datasets'
+  );
+
   const selectionPrompt = await DATA_GOV_SEARCH_SELECTION_PROMPT.formatMessages(
     {
       evaluations: newDatasets.map(d => JSON.stringify(d)).join('\n-----\n'),
