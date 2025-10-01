@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { ONE_SECOND } from '@lib/utils';
 import { workingDatasetMemory } from '@lib/database';
 
+export const VALID_DATASET_FORMATS = ['CSV'] as const;
+
 /**
  * Download and preview a dataset from data.gov (first 100 rows)
  */
@@ -87,7 +89,7 @@ export const datasetDownload = tool(
         .string()
         .describe('URL of the dataset resource to download'),
       format: z
-        .enum(['CSV'])
+        .enum(VALID_DATASET_FORMATS)
         .optional()
         .default('CSV')
         .describe(

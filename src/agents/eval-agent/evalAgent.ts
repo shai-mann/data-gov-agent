@@ -1,144 +1,171 @@
-import {
-  Annotation,
-  END,
-  MessagesAnnotation,
-  START,
-  StateGraph,
-} from '@langchain/langgraph';
-import {
-  DATA_GOV_EVALUATE_DATASET_PROMPT,
-  DATA_GOV_EVALUATE_OUTPUT_PROMPT,
-  DATA_GOV_EVALUATE_REMINDER_PROMPT,
-} from './prompts';
-import {
-  DatasetWithEvaluation,
-  DatasetWithEvaluationSchema,
-} from '@lib/annotation';
+import { Annotation, END, Send, START, StateGraph } from '@langchain/langgraph';
 import { openai } from '@llms';
-import { datasetDownload, doiView, packageShow } from '@tools';
-import { ToolNode } from '@langchain/langgraph/prebuilt';
-import { AIMessage } from '@langchain/core/messages';
+import { PendingResource, DatasetSummary, SummarySchema } from './annotations';
+import { PackageShowResponse } from '@lib/data-gov.schemas';
+import { DATA_GOV_SHALLOW_EVAL_SUMMATIVE_PROMPT } from './prompts';
+import { VALID_DATASET_FORMATS } from '@tools/datasetDownload';
+import { ResourceEvaluationAnnotation } from '../resource-eval-agent/resourceEvalAgent';
+import { resourceEvalAgent } from '..';
+import { ResourceEvaluation } from '../resource-eval-agent/annotations';
+
+/**
+ * This agent is a evaluation helper agent for the core Search Agent.
+ * It's used to evaluate a single dataset that the search agent finds, and determine if it's likely to answer the user's question.
+ */
+
+// Simple type to join the resource evaluation with the resource itself
+type ResourceWithEvaluation = ResourceEvaluation & PendingResource;
 
 /* ANNOTATIONS */
 
 const DatasetEvalAnnotation = Annotation.Root({
-  ...MessagesAnnotation.spec,
-  dataset: Annotation<DatasetWithEvaluation>,
-  userQuery: Annotation<string>,
+  userQuery: Annotation<string>(),
+  dataset: Annotation<PackageShowResponse>,
+
+  pendingResources: Annotation<PendingResource[]>,
+  evaluations: Annotation<ResourceWithEvaluation[]>({
+    reducer: (cur, val) => cur.concat(val),
+    default: () => [],
+  }),
+  summary: Annotation<DatasetSummary>,
 });
 
 /* MODELS */
 
-const tools = [packageShow, datasetDownload, doiView];
+const structuredSummativeModel = openai.withStructuredOutput(SummarySchema);
 
-const model = openai.bindTools(tools);
-const structuredModel = openai.withStructuredOutput(
-  DatasetWithEvaluationSchema
-);
+/* UTILS */
+
+function getFormat(resource: { format: string; mimetype: string | null }) {
+  // If both are empty (or null), format is invalid.
+  if (!resource.format && !resource.mimetype) {
+    return 'INVALID';
+  }
+
+  // Construct an uppercase list of types, excluding nulls and empty strings
+  const types = (
+    [resource.format, resource.mimetype].filter(Boolean) as string[]
+  ).map(t => t.toUpperCase());
+
+  return (
+    VALID_DATASET_FORMATS.find(f => types.some(t => f.includes(t))) ?? 'INVALID'
+  );
+}
 
 /* NODES */
 
 async function setupNode(state: typeof DatasetEvalAnnotation.State) {
-  const { dataset, userQuery } = state;
+  const { dataset } = state;
 
-  console.log('🔍 [EVAL] Initializing...');
+  // Extract all VALID resources, including their format, name, and URL
+  const resources = dataset.resources
+    .map(resource => ({
+      url: resource.url,
+      name: resource.name,
+      description: resource.description,
+      format: getFormat(resource),
+    }))
+    // Filter out resources that are not in the valid formats
+    .filter(r => r.format !== 'INVALID');
 
-  const prompt = await DATA_GOV_EVALUATE_DATASET_PROMPT.formatMessages({
-    query: userQuery,
-    datasetId: dataset.id,
-    datasetTitle: dataset.title,
-    datasetReason: dataset.reason,
-  });
-
-  return {
-    messages: prompt,
-  };
-}
-
-async function modelNode(state: typeof DatasetEvalAnnotation.State) {
-  console.log('🔍 [EVAL] Evaluating...');
-
-  const reminderPrompt = await DATA_GOV_EVALUATE_REMINDER_PROMPT.formatMessages(
-    {}
-  );
-
-  const result = await model.invoke([...state.messages, ...reminderPrompt]);
-
-  return {
-    messages: result,
-  };
-}
-
-async function outputNode(state: typeof DatasetEvalAnnotation.State) {
-  console.log('🔍 [EVAL] Structuring output...');
-
-  const { messages, dataset } = state;
-  const lastMessage = messages.at(-1) as AIMessage;
-
-  const prompt = await DATA_GOV_EVALUATE_OUTPUT_PROMPT.formatMessages({
-    datasetId: dataset.id,
-    datasetTitle: dataset.title,
-    datasetReason: dataset.reason,
-    evaluation: lastMessage.content as string,
-  });
-
-  const response = await structuredModel.invoke(prompt);
-
-  if (!response.evaluation?.usable) {
+  // Regardless of if there are extras, if no resources are valid, we can't use this dataset.
+  // Extras will never be datasets, so there must be at least one valid resource to warrant further investigation.
+  if (resources.length === 0) {
     return {
-      dataset: response,
+      pendingResources: [],
     };
   }
 
-  let cleanedBestResource = response.evaluation?.bestResource;
+  // Extract any VALID extra links
+  const extras = dataset.extras
+    // Filter to links
+    .filter(extra => extra.value.includes('http'))
+    // Map to pending resources format
+    .map(extra => ({
+      url: extra.value,
+      name: extra.key,
+      description: null,
+      format:
+        VALID_DATASET_FORMATS.find(f =>
+          extra.value.toLowerCase().includes(f.toLowerCase())
+        ) ?? 'INVALID',
+    }))
+    // Filter out invalid formats
+    .filter(r => r.format !== 'INVALID');
 
-  // Check and see if it was returned in MD format: [Title](link)
-  if (cleanedBestResource.includes('(')) {
-    cleanedBestResource = cleanedBestResource.split('(')[1];
+  const pendingResources = [...resources, ...extras];
+
+  return { pendingResources };
+}
+
+async function evalNode(state: typeof ResourceEvaluationAnnotation.State) {
+  const { resource, userQuery } = state;
+
+  // Call the per-resource eval-agent
+  const { evaluation } = await resourceEvalAgent.invoke({
+    resource,
+    userQuery,
+  });
+
+  if (!evaluation.usable) {
+    // If it is unusable, don't add it to the evaluations state. It will not be used from there.
+    return {};
   }
 
-  const massagedEvaluation = {
-    ...response,
-    evaluation: {
-      ...response.evaluation,
-      bestResource: cleanedBestResource,
-    },
-  };
-
+  // Knit resource together with evaluation and add it to the (outer) state.
   return {
-    dataset: massagedEvaluation,
+    evaluations: { ...evaluation, ...resource },
   };
+}
+
+async function summativeEvaluationNode(
+  state: typeof DatasetEvalAnnotation.State
+) {
+  const { evaluations, userQuery } = state;
+
+  if (evaluations.length === 0) {
+    return {};
+  }
+
+  const prompt = await DATA_GOV_SHALLOW_EVAL_SUMMATIVE_PROMPT.formatMessages({
+    resourceEvaluations: evaluations.map(e => JSON.stringify(e)).join('\n\n'),
+    userQuery,
+  });
+
+  const summary = await structuredSummativeModel.invoke(prompt);
+
+  console.log('🔍 [EVAL] Exiting workflow');
+  return { summary };
 }
 
 /* EDGES */
 
-function shouldContinue(state: typeof DatasetEvalAnnotation.State) {
-  const messages = state.messages;
-  const lastMessage = messages.at(-1) as AIMessage;
+async function fanOutEdge(state: typeof DatasetEvalAnnotation.State) {
+  const { pendingResources: resources, userQuery } = state;
 
-  if (
-    'tool_calls' in lastMessage &&
-    Array.isArray(lastMessage.tool_calls) &&
-    lastMessage.tool_calls?.length
-  ) {
-    return 'toolNode';
+  if (resources.length === 0) {
+    console.log('🔍 [EVAL] No resources found - exiting workflow');
+    return END;
   }
 
-  console.log('🔍 [EVAL] Exiting workflow');
-  return 'output';
+  console.log(
+    '🔍 [EVAL] Kicking off ',
+    resources.length,
+    'resource evaluations'
+  );
+  return resources.map(resource => new Send('eval', { resource, userQuery }));
 }
 
 const graph = new StateGraph(DatasetEvalAnnotation)
   .addNode('setup', setupNode)
-  .addNode('model', modelNode)
-  .addNode('toolNode', new ToolNode(tools))
-  .addNode('output', outputNode)
+  .addNode('eval', evalNode)
+  .addNode('formatEval', summativeEvaluationNode, { defer: true })
 
   .addEdge(START, 'setup')
-  .addEdge('setup', 'model')
-  .addConditionalEdges('model', shouldContinue, ['toolNode', 'output'])
-  .addEdge('toolNode', 'model')
-  .addEdge('output', END)
+  .addConditionalEdges('setup', fanOutEdge, ['eval', END])
+  .addEdge('eval', 'formatEval')
+  .addEdge('formatEval', END)
+
   .compile();
 
 export default graph;

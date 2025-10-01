@@ -29,7 +29,7 @@ app.post('/research', async c => {
 
     return c.json({
       success: true,
-      ...result,
+      result: result.output,
     });
   } catch (error) {
     console.error('Data Gov Agent error:', error);
