@@ -1,10 +1,5 @@
 import { Hono } from 'hono';
-import {
-  searchAgent,
-  shallowEvalAgent,
-  queryAgent,
-  resourceEvalAgent,
-} from '@agents';
+import { searchAgent, evalAgent, queryAgent, resourceEvalAgent } from '@agents';
 import { packageShow, datasetDownload } from '@tools';
 import { ResourceEvaluation } from '../agents/resource-eval-agent/annotations';
 
@@ -44,7 +39,7 @@ testing.post('/search', async c => {
   }
 });
 
-testing.post('/shallow-eval', async c => {
+testing.post('/eval', async c => {
   try {
     const { datasetId, query } = await c.req.json();
 
@@ -52,7 +47,7 @@ testing.post('/shallow-eval', async c => {
       packageId: datasetId,
     });
 
-    const result = await shallowEvalAgent.invoke({
+    const result = await evalAgent.invoke({
       dataset,
       userQuery: query,
     });

@@ -1,5 +1,5 @@
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph';
-import { PendingResource } from '@agents/shallow-eval-agent/annotations';
+import { PendingResource } from '@agents/eval-agent/annotations';
 import { openai } from '@llms';
 import { z } from 'zod';
 import {

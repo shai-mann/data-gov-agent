@@ -9,8 +9,8 @@ import { resourceEvalAgent } from '..';
 import { ResourceEvaluation } from '../resource-eval-agent/annotations';
 
 /**
- * This agent is a shallow evaluation helper agent for the core Search Agent.
- * It's used to shallowly evaluate a single dataset that the search agent finds, and determine if it's likely to answer the user's question.
+ * This agent is a evaluation helper agent for the core Search Agent.
+ * It's used to evaluate a single dataset that the search agent finds, and determine if it's likely to answer the user's question.
  */
 
 // Simple type to join the resource evaluation with the resource itself
@@ -101,7 +101,7 @@ async function setupNode(state: typeof DatasetEvalAnnotation.State) {
 async function evalNode(state: typeof ResourceEvaluationAnnotation.State) {
   const { resource, userQuery } = state;
 
-  // Call the shallow-eval-agent
+  // Call the per-resource eval-agent
   const { evaluation } = await resourceEvalAgent.invoke({
     resource,
     userQuery,
@@ -134,7 +134,7 @@ async function summativeEvaluationNode(
 
   const summary = await structuredSummativeModel.invoke(prompt);
 
-  console.log('🔍 [SHALLOW EVAL] Exiting workflow');
+  console.log('🔍 [EVAL] Exiting workflow');
   return { summary };
 }
 
@@ -144,12 +144,12 @@ async function fanOutEdge(state: typeof DatasetEvalAnnotation.State) {
   const { pendingResources: resources, userQuery } = state;
 
   if (resources.length === 0) {
-    console.log('🔍 [SHALLOW EVAL] No resources found - exiting workflow');
+    console.log('🔍 [EVAL] No resources found - exiting workflow');
     return END;
   }
 
   console.log(
-    '🔍 [SHALLOW EVAL] Kicking off ',
+    '🔍 [EVAL] Kicking off ',
     resources.length,
     'resource evaluations'
   );

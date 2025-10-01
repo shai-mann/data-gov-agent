@@ -15,8 +15,8 @@ import {
 } from './prompts';
 import { getLastAiMessageIndex, getToolMessages } from '@lib/utils';
 import { z } from 'zod';
-import shallowEvalAgent from '@agents/shallow-eval-agent/shallowEvalAgent';
-import { DatasetSummary } from '../shallow-eval-agent/annotations';
+import shallowEvalAgent from '@agents/eval-agent/evalAgent';
+import { DatasetSummary } from '../eval-agent/annotations';
 import { ResourceEvaluation } from '../resource-eval-agent/annotations';
 
 // TODO: replace the type in lib/annotations with this one, and move ancillary types there as well.
