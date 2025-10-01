@@ -8,6 +8,7 @@ import {
   resourceEvalAgent,
 } from '@agents';
 import { packageShow, datasetDownload } from '@tools';
+import { ResourceEvaluation } from '../agents/resource-eval-agent/annotations';
 
 /**
  * This contains testing routes for hitting the individual agents without any bells and whistles.
@@ -157,9 +158,17 @@ testing.post('/query', async c => {
       return c.json({ error: 'Query and dataset are required' }, 400);
     }
 
+    const resource = dataset.evaluations.find(
+      (r: ResourceEvaluation) => r.url === dataset.bestResource
+    );
+
+    if (!resource) {
+      return c.json({ error: 'Resource not found' }, 400);
+    }
+
     // Pre-fetch the dataset
     await datasetDownload.invoke({
-      resourceUrl: dataset.evaluation.bestResource,
+      resourceUrl: resource.url,
     });
 
     const result = await queryAgent.invoke({

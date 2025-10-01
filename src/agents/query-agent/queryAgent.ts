@@ -12,10 +12,7 @@ import {
   QUERY_AGENT_SQL_REMINDER_PROMPT,
   QUERY_AGENT_TABLE_NAME_PROMPT,
 } from './prompts';
-import {
-  DatasetWithEvaluation,
-  QueryAgentSummarySchema,
-} from '@lib/annotation';
+import { QueryAgentSummarySchema } from '@lib/annotation';
 import { openai } from '@llms';
 import { ToolNode } from '@langchain/langgraph/prebuilt';
 import { AIMessage } from '@langchain/core/messages';
@@ -24,10 +21,10 @@ import { datasetDownload } from '@tools/datasetDownload';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
-import contextAgent from '@agents/context-agent/contextAgent';
 import { getLastAiMessageIndex, getToolMessages } from '@lib/utils';
 import { conn, workingDatasetMemory } from '@lib/database';
 import { sqlQueryTool } from '@tools';
+import { DatasetWithEvaluation } from '@agents/search-agent/searchAgent';
 
 const MAX_QUERY_COUNT = 10;
 
@@ -70,24 +67,28 @@ const tableNameStructuredModel = openai.withStructuredOutput(
  * Handles initializing the "database" (with DuckDB, in-mem), creating the table and populating it, and providing a preview of the dataset.
  */
 async function setupNode(state: typeof DatasetEvalAnnotation.State) {
-  const { dataset } = state;
+  const { dataset, userQuery } = state;
 
   console.log('🔍 [QUERY] Initializing...');
 
-  if (dataset.evaluation === undefined || dataset.evaluation.usable === false) {
-    throw new Error('Dataset is not usable');
+  // Find the resource being used by matching the URL
+  const resource = dataset.evaluations.find(
+    r => r.url === dataset.bestResource
+  );
+
+  if (!resource) {
+    throw new Error('[QUERY] bestResource had no evaluation.');
   }
 
   // Get a name for the table
   const { table } = await tableNameStructuredModel.invoke(
     await QUERY_AGENT_TABLE_NAME_PROMPT.formatMessages({
-      dataset: dataset.title,
+      dataset: resource.name,
     })
   );
 
   // Fetch the dataset (re-using the tool will result in using the cached data, since it must have been checked already)
-  const csvDataset =
-    workingDatasetMemory[dataset.evaluation.bestResource].join('\n');
+  const csvDataset = workingDatasetMemory[resource.url].join('\n');
 
   // Write to a temp file
   const tmpPath = path.join(os.tmpdir(), `tmp_${Date.now()}.csv`);
@@ -106,37 +107,25 @@ async function setupNode(state: typeof DatasetEvalAnnotation.State) {
   }
 
   const { preview } = await datasetDownload.invoke({
-    resourceUrl: dataset.evaluation.bestResource,
+    resourceUrl: resource.url,
     limit: 20,
     offset: 0,
+  });
+
+  if (!preview) {
+    throw new Error('[QUERY] No preview could be generated.');
+  }
+
+  const prompt = await QUERY_AGENT_SQL_QUERY_PROMPT.formatMessages({
+    tableName: table,
+    query: userQuery,
+    preview: preview.join('\n'),
+    context: JSON.stringify(resource),
   });
 
   return {
     tableName: table,
     preview,
-  };
-}
-
-/**
- * Invokes the context agent to generate a context prompt for the model before it iterates.
- */
-async function contextNode(state: typeof DatasetEvalAnnotation.State) {
-  const { dataset, preview, tableName, userQuery } = state;
-
-  // Call the context agent
-  const { summary } = await contextAgent.invoke({
-    dataset,
-  });
-
-  // Construct the prompt for the model, including the context from the context agent
-  const prompt = await QUERY_AGENT_SQL_QUERY_PROMPT.formatMessages({
-    tableName,
-    query: userQuery,
-    context: summary,
-    preview: preview.join('\n'),
-  });
-
-  return {
     messages: prompt,
   };
 }
@@ -257,7 +246,6 @@ function shouldContinue(state: typeof DatasetEvalAnnotation.State) {
 
 const graph = new StateGraph(DatasetEvalAnnotation)
   .addNode('setup', setupNode)
-  .addNode('context', contextNode)
   .addNode('model', modelNode)
   .addNode('toolNode', new ToolNode(tools))
   .addNode('postTool', postToolNode)
@@ -265,8 +253,7 @@ const graph = new StateGraph(DatasetEvalAnnotation)
   .addNode('output', outputNode)
 
   .addEdge(START, 'setup')
-  .addEdge('setup', 'context')
-  .addEdge('context', 'model')
+  .addEdge('setup', 'model')
   .addConditionalEdges('model', shouldContinue, ['toolNode', 'output'])
   .addEdge('toolNode', 'postTool')
   .addEdge('postTool', 'evaluateQuery')

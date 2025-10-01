@@ -19,7 +19,8 @@ import shallowEvalAgent from '@agents/shallow-eval-agent/shallowEvalAgent';
 import { DatasetSummary } from '../shallow-eval-agent/annotations';
 import { ResourceEvaluation } from '../resource-eval-agent/annotations';
 
-type DatasetWithEvaluation = DatasetSummary & {
+// TODO: replace the type in lib/annotations with this one, and move ancillary types there as well.
+export type DatasetWithEvaluation = DatasetSummary & {
   id: string;
   evaluations: ResourceEvaluation[];
 };

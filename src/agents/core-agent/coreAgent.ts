@@ -5,10 +5,7 @@ import {
   START,
   StateGraph,
 } from '@langchain/langgraph';
-import {
-  DatasetWithEvaluation,
-  QueryAgentSummarySchema,
-} from '@lib/annotation';
+import { QueryAgentSummarySchema } from '@lib/annotation';
 import { openai } from '@llms';
 import { z } from 'zod';
 import { queryAgent, searchAgent } from '..';
@@ -17,6 +14,7 @@ import {
   DATA_GOV_FINAL_EVALUATION_PROMPT,
   DATA_GOV_USER_QUERY_FORMATTING_PROMPT,
 } from './prompts';
+import { DatasetWithEvaluation } from '@agents/search-agent/searchAgent';
 
 /*
 NOTE: This **was** a core agent (running exactly as you see below), but due to token limitations (20k tokens/min for my account),

@@ -7,7 +7,7 @@ import {
   DATA_GOV_SHALLOW_EVAL_SINGLE_RESOURCE_PROMPT,
 } from './prompts';
 import { datasetDownload, doiView } from '@tools';
-import { ResourceEvaluation, ResourceEvaluationSchema } from './annotations';
+import { ResourceEvaluationSchema, ResourceEvaluation } from './annotations';
 
 /* ANNOTATIONS */
 
@@ -69,6 +69,9 @@ async function evaluateResourceNode(
     shouldPerformDeepEval: worthInvestigating,
     // If the resource is not worth investigating, it is not usable
     evaluation: {
+      url: resource.url,
+      name: resource.name,
+      description: resource.description,
       summary: reasoning,
       usable: !worthInvestigating ? false : undefined,
       usability_reason: reasoning,
@@ -128,7 +131,14 @@ async function deepEvalNode(state: typeof ResourceEvaluationAnnotation.State) {
 
   console.log('🔍 [DEEP EVAL] Performing deep evaluation on', resource.name);
 
-  const evaluation = await structuredDeepEvalModel.invoke(prompt);
+  const deidentifiedEvaluation = await structuredDeepEvalModel.invoke(prompt);
+
+  const evaluation = {
+    url: resource.url,
+    name: resource.name,
+    description: resource.description,
+    ...deidentifiedEvaluation,
+  };
 
   return { evaluation };
 }

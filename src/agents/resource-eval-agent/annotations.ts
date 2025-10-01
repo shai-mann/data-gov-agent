@@ -22,4 +22,10 @@ export const ResourceEvaluationSchema = z.object({
     .describe('The columns of the resource'),
 });
 
-export type ResourceEvaluation = z.infer<typeof ResourceEvaluationSchema>;
+export type RawResourceEvaluation = z.infer<typeof ResourceEvaluationSchema>;
+
+export type ResourceEvaluation = RawResourceEvaluation & {
+  url: string;
+  name: string;
+  description: string | null;
+};
