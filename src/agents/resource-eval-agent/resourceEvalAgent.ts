@@ -130,8 +130,6 @@ async function deepEvalNode(state: typeof ResourceEvaluationAnnotation.State) {
 
   const evaluation = await structuredDeepEvalModel.invoke(prompt);
 
-  console.log('🔍 [DEEP EVAL] Evaluation: ', evaluation);
-
   return { evaluation };
 }
 

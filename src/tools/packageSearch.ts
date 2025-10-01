@@ -28,6 +28,7 @@ export const packageSearch = tool(
         state: pkg.state, // active, not active, etc.
 
         resources: [], // skip the packages to save on context size, but the schema requires the key to exist
+        extras: [], // skip the extras to save on context size
       }))
       .map(pkg => PackageShowSchema.parse(pkg));
 

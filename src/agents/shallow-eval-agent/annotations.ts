@@ -26,4 +26,4 @@ export const SummarySchema = z.object({
     .describe('Supporting resource URLs (exact URLs only).'),
 });
 
-export type Summary = z.infer<typeof SummarySchema>;
+export type DatasetSummary = z.infer<typeof SummarySchema>;

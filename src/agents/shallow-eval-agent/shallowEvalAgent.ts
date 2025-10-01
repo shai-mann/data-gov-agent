@@ -1,6 +1,6 @@
 import { Annotation, END, Send, START, StateGraph } from '@langchain/langgraph';
 import { openai } from '@llms';
-import { PendingResource, Summary, SummarySchema } from './annotations';
+import { PendingResource, DatasetSummary, SummarySchema } from './annotations';
 import { PackageShowResponse } from '@lib/data-gov.schemas';
 import { DATA_GOV_SHALLOW_EVAL_SUMMATIVE_PROMPT } from './prompts';
 import { VALID_DATASET_FORMATS } from '@tools/datasetDownload';
@@ -27,7 +27,7 @@ const DatasetEvalAnnotation = Annotation.Root({
     reducer: (cur, val) => cur.concat(val),
     default: () => [],
   }),
-  summary: Annotation<Summary>,
+  summary: Annotation<DatasetSummary>,
 });
 
 /* MODELS */
