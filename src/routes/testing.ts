@@ -2,9 +2,7 @@ import { Hono } from 'hono';
 import {
   searchAgent,
   shallowEvalAgent,
-  evalAgent,
   queryAgent,
-  contextAgent,
   resourceEvalAgent,
 } from '@agents';
 import { packageShow, datasetDownload } from '@tools';
@@ -99,54 +97,6 @@ testing.post('/resource-eval', async c => {
       },
       500
     );
-  }
-});
-
-testing.post('/eval', async c => {
-  try {
-    const { dataset, query } = await c.req.json();
-
-    if (!dataset || !query) {
-      return c.json({ error: 'Dataset and query are required' }, 400);
-    }
-
-    const result = await evalAgent.invoke({
-      dataset,
-      userQuery: query,
-    });
-
-    return c.json({
-      success: true,
-      ...result,
-    });
-  } catch (error) {
-    console.error('Eval Agent query error:', error);
-    return c.json(
-      {
-        success: false,
-        error:
-          error instanceof Error ? error.message : 'Unknown error occurred',
-      },
-      500
-    );
-  }
-});
-
-testing.post('/context', async c => {
-  try {
-    const { dataset } = await c.req.json();
-
-    const result = await contextAgent.invoke({
-      dataset,
-    });
-
-    return c.json({
-      success: true,
-      ...result,
-    });
-  } catch (error) {
-    console.error('Context Agent error:', error);
-    return c.json({ error: 'Internal Server Error' }, 500);
   }
 });
 
