@@ -1,6 +1,5 @@
 import { Hono } from 'hono';
 import {
-  coreAgent,
   searchAgent,
   shallowEvalAgent,
   evalAgent,
@@ -16,35 +15,6 @@ import { packageShow, datasetDownload } from '@tools';
  */
 
 const testing = new Hono();
-
-testing.post('/core', async c => {
-  try {
-    const { query } = await c.req.json();
-
-    if (!query) {
-      return c.json({ error: 'Query parameter is required' }, 400);
-    }
-
-    const result = await coreAgent.invoke({
-      userQuery: query,
-    });
-
-    return c.json({
-      success: true,
-      ...result,
-    });
-  } catch (error) {
-    console.error('Core Agent error:', error);
-    return c.json(
-      {
-        success: false,
-        error:
-          error instanceof Error ? error.message : 'Unknown error occurred',
-      },
-      500
-    );
-  }
-});
 
 testing.post('/search', async c => {
   try {
