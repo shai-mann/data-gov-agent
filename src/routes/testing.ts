@@ -6,6 +6,7 @@ import {
   evalAgent,
   queryAgent,
   contextAgent,
+  resourceEvalAgent,
 } from '@agents';
 import { packageShow, datasetDownload } from '@tools';
 
@@ -93,6 +94,32 @@ testing.post('/shallow-eval', async c => {
     });
   } catch (error) {
     console.error('Shallow eval error:', error);
+    return c.json(
+      {
+        success: false,
+        error:
+          error instanceof Error ? error.message : 'Unknown error occurred',
+      },
+      500
+    );
+  }
+});
+
+testing.post('/resource-eval', async c => {
+  try {
+    const { resource, query } = await c.req.json();
+
+    const result = await resourceEvalAgent.invoke({
+      resource,
+      userQuery: query,
+    });
+
+    return c.json({
+      success: true,
+      ...result,
+    });
+  } catch (error) {
+    console.error('Resource eval error:', error);
     return c.json(
       {
         success: false,

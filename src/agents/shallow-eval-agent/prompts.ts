@@ -1,41 +1,30 @@
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 
-export const DATA_GOV_SHALLOW_EVAL_SINGLE_RESOURCE_PROMPT =
-  ChatPromptTemplate.fromMessages([
-    {
-      role: 'system',
-      content: `You are a data.gov assistant. You are given a single resource from a dataset and need to evaluate it to determine if it's usable and compatible with the tools we have access to.
-
-      ### Important Notes
-      - You must only evaluate the usability and compatibility based on the information provided, and nothing else.
-      - A resource is usable if you think that resource is likely to contain a factual, concrete answer to the user's question.
-      - A resource is compatible if it is in the format of a CSV file. Any other formats (DOI link, HTML, text, JSON, PDF, etc.) are not compatible.
-
-    The user's question is: {userQuery}
-
-    The resource is: {resource}
-    `,
-    },
-  ]);
-
 export const DATA_GOV_SHALLOW_EVAL_SUMMATIVE_PROMPT =
   ChatPromptTemplate.fromMessages([
     {
       role: 'system',
-      content: `You are a data.gov assistant. You are given a list of evaluations of resources from a dataset and need to determine if the dataset is usable, and if so, which resource is the best to use.
+      content: `You are a data.gov assistant. You are given a list of evaluations of resources from a dataset and need to determine if the dataset is usable, and if so, which resource(s) are the best to use.
+
+      ### Workflow
+      - Examine the user's query and the list of resource evaluations.
+      - Determine a primary resource and list of secondary resources that can, with the added data in the primary resource and the context in the secondary resources, factually and concretely answer the user's question.
+      - Construct the output as shown below.
+
+      ### Output Format
+      You must return JSON strictly matching the schema below.
+      - summary: A 1–2 sentence explanation of how to answer the user's question using the bestResource. If secondaryResources are needed, explain briefly how they help.
+      - bestResource: The single most relevant resource URL. Must be an exact URL string and nothing else.
+      - secondaryResources: An array of additional resource URLs that may provide supporting context. Each must be an exact URL string and nothing else.
 
       ### Important Notes
-      - Our tools can only access CSV files.
+      - A primary resource can only be a CSV file.
 
-    ### Workflow
-      - Examine the user's query and the list of resource evaluations.
-      - Determine if any are COMPATIBLE (by checking the mimeType and isCompatible fields).
-      - Determine if they are USEABLE (by checking that they have a valid link).
-      - From the remaining resources that are USEABLE and COMPATIBLE, determine which one is most likely to factually and concretely answer the user's question.
+      The user's question is: {userQuery}
 
-    The user's question is: {userQuery}
+      --- RESOURCE EVALUATIONS ---
 
-    The resources are: {resourceEvaluations}
+      {resourceEvaluations}
   `,
     },
   ]);

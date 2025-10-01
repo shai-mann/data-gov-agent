@@ -1,50 +1,60 @@
 import { Annotation, END, Send, START, StateGraph } from '@langchain/langgraph';
 import { openai } from '@llms';
-import { PendingResource, ShallowEvaluationSchema } from './annotations';
-import { z } from 'zod';
+import { PendingResource, Summary, SummarySchema } from './annotations';
 import { PackageShowResponse } from '@lib/data-gov.schemas';
-import {
-  DATA_GOV_SHALLOW_EVAL_SINGLE_RESOURCE_PROMPT,
-  DATA_GOV_SHALLOW_EVAL_SUMMATIVE_PROMPT,
-} from './prompts';
+import { DATA_GOV_SHALLOW_EVAL_SUMMATIVE_PROMPT } from './prompts';
 import { VALID_DATASET_FORMATS } from '@tools/datasetDownload';
+import { ResourceEvaluationAnnotation } from '../resource-eval-agent/resourceEvalAgent';
+import { resourceEvalAgent } from '..';
+import { ResourceEvaluation } from '../resource-eval-agent/annotations';
 
 /**
  * This agent is a shallow evaluation helper agent for the core Search Agent.
  * It's used to shallowly evaluate a single dataset that the search agent finds, and determine if it's likely to answer the user's question.
  */
 
+// Simple type to join the resource evaluation with the resource itself
+type ResourceWithEvaluation = ResourceEvaluation & PendingResource;
+
 /* ANNOTATIONS */
 
-const ShallowSearchAnnotation = Annotation.Root({
+const DatasetEvalAnnotation = Annotation.Root({
   userQuery: Annotation<string>(),
   dataset: Annotation<PackageShowResponse>,
 
   pendingResources: Annotation<PendingResource[]>,
-  resourceEvaluations: Annotation<z.infer<typeof ShallowEvaluationSchema>[]>({
+  evaluations: Annotation<ResourceWithEvaluation[]>({
     reducer: (cur, val) => cur.concat(val),
     default: () => [],
   }),
-  summary: Annotation<z.infer<typeof ShallowEvaluationSchema>>,
-});
-
-const ResourceEvaluationAnnotation = Annotation.Root({
-  resource: Annotation<PendingResource>,
-  userQuery: Annotation<string>(),
+  summary: Annotation<Summary>,
 });
 
 /* MODELS */
 
-// Structured model to evaluate a single resource in the dataset
-const structuredModel = openai.withStructuredOutput(ShallowEvaluationSchema);
+const structuredSummativeModel = openai.withStructuredOutput(SummarySchema);
 
-const structuredSummativeModel = openai.withStructuredOutput(
-  ShallowEvaluationSchema
-);
+/* UTILS */
+
+function getFormat(resource: { format: string; mimetype: string | null }) {
+  // If both are empty (or null), format is invalid.
+  if (!resource.format && !resource.mimetype) {
+    return 'INVALID';
+  }
+
+  // Construct an uppercase list of types, excluding nulls and empty strings
+  const types = (
+    [resource.format, resource.mimetype].filter(Boolean) as string[]
+  ).map(t => t.toUpperCase());
+
+  return (
+    VALID_DATASET_FORMATS.find(f => types.some(t => f.includes(t))) ?? 'INVALID'
+  );
+}
 
 /* NODES */
 
-async function setupNode(state: typeof ShallowSearchAnnotation.State) {
+async function setupNode(state: typeof DatasetEvalAnnotation.State) {
   const { dataset } = state;
 
   // Extract all VALID resources, including their format, name, and URL
@@ -52,15 +62,19 @@ async function setupNode(state: typeof ShallowSearchAnnotation.State) {
     .map(resource => ({
       url: resource.url,
       name: resource.name,
-      format:
-        VALID_DATASET_FORMATS.find(
-          f =>
-            f.toLowerCase().includes(resource.format.toLowerCase()) ||
-            f.toLowerCase().includes(resource.mimetype?.toLowerCase() ?? '')
-        ) ?? 'INVALID',
+      description: resource.description,
+      format: getFormat(resource),
     }))
     // Filter out resources that are not in the valid formats
     .filter(r => r.format !== 'INVALID');
+
+  // Regardless of if there are extras, if no resources are valid, we can't use this dataset.
+  // Extras will never be datasets, so there must be at least one valid resource to warrant further investigation.
+  if (resources.length === 0) {
+    return {
+      pendingResources: [],
+    };
+  }
 
   // Extract any VALID extra links
   const extras = dataset.extras
@@ -70,6 +84,7 @@ async function setupNode(state: typeof ShallowSearchAnnotation.State) {
     .map(extra => ({
       url: extra.value,
       name: extra.key,
+      description: null,
       format:
         VALID_DATASET_FORMATS.find(f =>
           extra.value.toLowerCase().includes(f.toLowerCase())
@@ -80,55 +95,52 @@ async function setupNode(state: typeof ShallowSearchAnnotation.State) {
 
   const pendingResources = [...resources, ...extras];
 
-  console.log(
-    '🔍 [SHALLOW EVAL] Kicking off ',
-    pendingResources.length,
-    'resource evaluations'
-  );
   return { pendingResources };
 }
 
-/**
- * Evaluates a single resource in the dataset, extracting metadata and determining if it's compatible with the tools we have access to.
- */
-async function evaluateResourceNode(
-  state: typeof ResourceEvaluationAnnotation.State
-) {
+async function evalNode(state: typeof ResourceEvaluationAnnotation.State) {
   const { resource, userQuery } = state;
 
-  console.log('🔍 [SHALLOW EVAL] Evaluating resource...', resource.name);
-
-  const prompt =
-    await DATA_GOV_SHALLOW_EVAL_SINGLE_RESOURCE_PROMPT.formatMessages({
-      resource: JSON.stringify(resource),
-      userQuery,
-    });
-
-  const evaluation = await structuredModel.invoke(prompt);
-
-  // Use the key of the outer graph to add to the core state.
-  return { resourceEvaluations: evaluation };
-}
-
-async function summativeEvaluationNode(
-  state: typeof ShallowSearchAnnotation.State
-) {
-  const { resourceEvaluations, userQuery } = state;
-
-  const prompt = await DATA_GOV_SHALLOW_EVAL_SUMMATIVE_PROMPT.formatMessages({
-    resourceEvaluations: JSON.stringify(resourceEvaluations),
+  // Call the shallow-eval-agent
+  const { evaluation } = await resourceEvalAgent.invoke({
+    resource,
     userQuery,
   });
 
-  const evaluation = await structuredSummativeModel.invoke(prompt);
+  if (!evaluation.usable) {
+    // If it is unusable, don't add it to the evaluations state. It will not be used from there.
+    return {};
+  }
+
+  // Knit resource together with evaluation and add it to the (outer) state.
+  return {
+    evaluations: { ...evaluation, ...resource },
+  };
+}
+
+async function summativeEvaluationNode(
+  state: typeof DatasetEvalAnnotation.State
+) {
+  const { evaluations, userQuery } = state;
+
+  if (evaluations.length === 0) {
+    return {};
+  }
+
+  const prompt = await DATA_GOV_SHALLOW_EVAL_SUMMATIVE_PROMPT.formatMessages({
+    resourceEvaluations: evaluations.map(e => JSON.stringify(e)).join('\n\n'),
+    userQuery,
+  });
+
+  const summary = await structuredSummativeModel.invoke(prompt);
 
   console.log('🔍 [SHALLOW EVAL] Exiting workflow');
-  return { evaluation };
+  return { summary };
 }
 
 /* EDGES */
 
-async function fanOutEdge(state: typeof ShallowSearchAnnotation.State) {
+async function fanOutEdge(state: typeof DatasetEvalAnnotation.State) {
   const { pendingResources: resources, userQuery } = state;
 
   if (resources.length === 0) {
@@ -136,18 +148,23 @@ async function fanOutEdge(state: typeof ShallowSearchAnnotation.State) {
     return END;
   }
 
+  console.log(
+    '🔍 [SHALLOW EVAL] Kicking off ',
+    resources.length,
+    'resource evaluations'
+  );
   return resources.map(resource => new Send('eval', { resource, userQuery }));
 }
 
-const graph = new StateGraph(ShallowSearchAnnotation)
+const graph = new StateGraph(DatasetEvalAnnotation)
   .addNode('setup', setupNode)
-  .addNode('eval', evaluateResourceNode)
-  .addNode('summary', summativeEvaluationNode)
+  .addNode('eval', evalNode)
+  .addNode('formatEval', summativeEvaluationNode, { defer: true })
 
   .addEdge(START, 'setup')
   .addConditionalEdges('setup', fanOutEdge, ['eval', END])
-  .addEdge('eval', 'summary')
-  .addEdge('summary', END)
+  .addEdge('eval', 'formatEval')
+  .addEdge('formatEval', END)
 
   .compile();
 

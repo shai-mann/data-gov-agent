@@ -4,3 +4,4 @@ export { default as shallowEvalAgent } from './shallow-eval-agent/shallowEvalAge
 export { default as evalAgent } from './eval-agent/evalAgent';
 export { default as queryAgent } from './query-agent/queryAgent';
 export { default as contextAgent } from './context-agent/contextAgent';
+export { default as resourceEvalAgent } from './resource-eval-agent/resourceEvalAgent';

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { BoolOrStringSchema } from './utils';
 
 // Zod schema for the response of the package search
 export const PackageSearchResponseSchema = z.object({
@@ -53,7 +54,7 @@ export const PackageShowSchema = z.object({
   extras: z.array(
     z.object({
       key: z.string(),
-      value: z.string(),
+      value: BoolOrStringSchema,
     })
   ),
 });
