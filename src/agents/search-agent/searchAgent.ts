@@ -7,18 +7,21 @@ import {
   StateGraph,
 } from '@langchain/langgraph';
 import { ToolNode } from '@langchain/langgraph/prebuilt';
-import { packageSearch, packageNameSearch, packageShow } from '@tools';
+import { packageSearch, packageShow } from '@tools';
 import { openai } from '@llms';
 import {
   DATA_GOV_SEARCH_PROMPT,
-  DATA_GOV_SEARCH_REMINDER_PROMPT as DATA_GOV_SEARCH_SELECTION_PROMPT,
+  DATA_GOV_SEARCH_SELECTION_PROMPT,
 } from './prompts';
 import { getLastAiMessageIndex, getToolMessages } from '@lib/utils';
 import { z } from 'zod';
-import shallowEvalAgent from '@agents/eval-agent/evalAgent';
 import { DatasetSummary } from '../eval-agent/annotations';
 import { ResourceEvaluation } from '../resource-eval-agent/annotations';
 import { logSubState } from '@lib/ws-logger';
+import evalAgent from '@agents/eval-agent/evalAgent';
+import { AIMessage } from 'langchain';
+
+const MAX_QUERY_COUNT = 50; // To prevent infinite loops, we let it try 15 different queries before giving up.
 
 // TODO: replace the type in lib/annotations with this one, and move ancillary types there as well.
 export type DatasetWithEvaluation = DatasetSummary & {
@@ -30,6 +33,10 @@ export type DatasetWithEvaluation = DatasetSummary & {
 const DatasetSearchAnnotation = Annotation.Root({
   ...MessagesAnnotation.spec,
   datasets: Annotation<DatasetWithEvaluation[]>({
+    reducer: (cur, val) => cur.concat(val),
+    default: () => [],
+  }),
+  pastQueries: Annotation<string[]>({
     reducer: (cur, val) => cur.concat(val),
     default: () => [],
   }),
@@ -50,7 +57,7 @@ const EvalDatasetAnnotation = Annotation.Root({
 
 /* MODELS */
 
-const tools = [packageSearch, packageNameSearch];
+const tools = [packageSearch];
 
 const model = openai.bindTools(tools);
 
@@ -67,31 +74,17 @@ const structuredModel = openai.withStructuredOutput(
 /* NODES */
 
 /**
- * Node to setup the dataset searching agent.
- */
-async function setupNode(state: typeof DatasetSearchAnnotation.State) {
-  const { userQuery } = state;
-
-  if (!userQuery) {
-    throw new Error('Must provide a user query');
-  }
-
-  const prompt = await DATA_GOV_SEARCH_PROMPT.formatMessages({
-    query: userQuery,
-  });
-
-  return {
-    messages: prompt,
-  };
-}
-
-/**
  * Node to call the model to search for datasets.
  */
 async function modelNode(state: typeof DatasetSearchAnnotation.State) {
-  const { messages } = state;
+  const { pastQueries, userQuery } = state;
 
-  const result = await model.invoke(messages);
+  const prompt = await DATA_GOV_SEARCH_PROMPT.formatMessages({
+    query: userQuery,
+    pastQueries: pastQueries.length > 0 ? pastQueries.join('\n') : 'None',
+  });
+
+  const result = await model.invoke(prompt);
 
   return {
     messages: result,
@@ -122,43 +115,52 @@ async function postToolsNode(state: typeof DatasetSearchAnnotation.State) {
     // Filter out the datasets that have already been selected.
     .filter(id => !datasets.some(d => d.id === id));
 
+  const packageSearches = (
+    messages.at(lastAiMessageIndex) as AIMessage
+  )?.tool_calls
+    ?.filter(t => t.name === 'package_search')
+    .map(t => t.args.query);
+
   logSubState(
     connectionId,
     'DatasetSearch',
     `Found ${packageSearchDatasetIds.length} new datasets to evaluate`
   );
 
-  return { pendingDatasets: packageSearchDatasetIds };
+  return {
+    pendingDatasets: packageSearchDatasetIds,
+    pastQueries: packageSearches,
+  };
 }
 
 /**
  * Node to evaluate a dataset.
  */
-async function shallowEvalNode(state: typeof EvalDatasetAnnotation.State) {
+async function evalNode(state: typeof EvalDatasetAnnotation.State) {
   const { datasetId, userQuery, connectionId } = state;
-
-  logSubState(
-    connectionId,
-    'DatasetSearch',
-    `Evaluating dataset: ${datasetId}`
-  );
 
   const dataset = await packageShow.invoke({
     packageId: datasetId,
   });
 
-  const { summary, evaluations } = await shallowEvalAgent.invoke({
+  logSubState(
+    connectionId,
+    'DatasetSearch',
+    `Evaluating dataset: ${dataset.name}`
+  );
+
+  const { summary, evaluations } = await evalAgent.invoke({
     dataset,
     userQuery,
     connectionId,
   });
 
-  // If the dataset is not compatible, don't add it to the state.
+  // If the dataset is not compatible or not relevant, don't add it to the state.
   if (!summary) {
     logSubState(
       connectionId,
       'DatasetSearch',
-      `Dataset ${datasetId} not compatible`
+      `Dataset ${dataset.name} not compatible or irrelevant`
     );
     return {};
   }
@@ -172,7 +174,7 @@ async function shallowEvalNode(state: typeof EvalDatasetAnnotation.State) {
   logSubState(
     connectionId,
     'DatasetSearch',
-    `Dataset ${datasetId} evaluation complete`,
+    `Dataset ${dataset.name} evaluation complete`,
     {
       bestResource: datasetSelection.bestResource,
     }
@@ -250,7 +252,7 @@ function shouldContinueToTools(state: typeof DatasetSearchAnnotation.State) {
     return 'tools';
   }
 
-  return END;
+  return 'model';
 }
 
 /**
@@ -260,25 +262,34 @@ function shouldContinueToTools(state: typeof DatasetSearchAnnotation.State) {
 function shouldContinueToEval(state: typeof DatasetSearchAnnotation.State) {
   const { pendingDatasets, userQuery, datasets, connectionId } = state;
 
-  if (pendingDatasets.length === 0) {
+  // De-duplicate the pending datasets, and filter out the datasets that have already been evaluated.
+  const newPendingDatasets = [...new Set(pendingDatasets)].filter(
+    id => !datasets.some(d => d.id === id)
+  );
+
+  if (newPendingDatasets.length === 0) {
     return 'model';
   }
 
-  return pendingDatasets.map(
+  return newPendingDatasets.map(
     id =>
-      new Send('shallowEval', {
+      new Send('eval', {
         datasetId: id,
         userQuery,
-        datasets,
         connectionId,
       })
   );
 }
 
 function shouldContinueToModel(state: typeof DatasetSearchAnnotation.State) {
-  const { selectedDataset } = state;
+  const { selectedDataset, pastQueries, connectionId } = state;
 
-  if (selectedDataset) {
+  if (selectedDataset || pastQueries.length >= MAX_QUERY_COUNT) {
+    logSubState(
+      connectionId,
+      'DatasetSearch',
+      `Reached maximum query count of ${MAX_QUERY_COUNT}. Stopping search.`
+    );
     return END;
   }
 
@@ -286,23 +297,18 @@ function shouldContinueToModel(state: typeof DatasetSearchAnnotation.State) {
 }
 
 const graph = new StateGraph(DatasetSearchAnnotation)
-  .addNode('setup', setupNode)
   .addNode('model', modelNode)
   .addNode('tools', new ToolNode(tools))
   .addNode('postTools', postToolsNode)
-  .addNode('shallowEval', shallowEvalNode)
+  .addNode('eval', evalNode)
   // Defer the try select node, so the shallow eval nodes are forced to fan-in before it runs.
   .addNode('trySelect', trySelectNode, { defer: true })
 
-  .addEdge(START, 'setup')
-  .addEdge('setup', 'model')
-  .addConditionalEdges('model', shouldContinueToTools, ['tools', END])
+  .addEdge(START, 'model')
+  .addConditionalEdges('model', shouldContinueToTools, ['tools', 'model'])
   .addEdge('tools', 'postTools')
-  .addConditionalEdges('postTools', shouldContinueToEval, [
-    'shallowEval',
-    'model',
-  ])
-  .addEdge('shallowEval', 'trySelect')
+  .addConditionalEdges('postTools', shouldContinueToEval, ['eval', 'model'])
+  .addEdge('eval', 'trySelect')
   .addConditionalEdges('trySelect', shouldContinueToModel, ['model', END])
 
   .compile();

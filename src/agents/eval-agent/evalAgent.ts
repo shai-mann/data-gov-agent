@@ -2,11 +2,15 @@ import { Annotation, END, Send, START, StateGraph } from '@langchain/langgraph';
 import { openai } from '@llms';
 import { PendingResource, DatasetSummary, SummarySchema } from './annotations';
 import { PackageShowResponse } from '@lib/data-gov.schemas';
-import { DATA_GOV_SHALLOW_EVAL_SUMMATIVE_PROMPT } from './prompts';
+import {
+  DATA_GOV_SHALLOW_EVAL_SUMMATIVE_PROMPT,
+  EVAL_DATASET_PROMPT,
+} from './prompts';
 import { VALID_DATASET_FORMATS } from '@tools/datasetDownload';
 import { ResourceEvaluationAnnotation } from '../resource-eval-agent/resourceEvalAgent';
 import { resourceEvalAgent } from '..';
 import { ResourceEvaluation } from '../resource-eval-agent/annotations';
+import { z } from 'zod';
 
 /**
  * This agent is a evaluation helper agent for the core Search Agent.
@@ -22,6 +26,7 @@ const DatasetEvalAnnotation = Annotation.Root({
   userQuery: Annotation<string>(),
   dataset: Annotation<PackageShowResponse>,
 
+  shouldInvestigateResources: Annotation<boolean>(),
   pendingResources: Annotation<PendingResource[]>,
   evaluations: Annotation<ResourceWithEvaluation[]>({
     reducer: (cur, val) => cur.concat(val),
@@ -32,6 +37,14 @@ const DatasetEvalAnnotation = Annotation.Root({
 });
 
 /* MODELS */
+
+const structuredModel = openai.withStructuredOutput(
+  z.object({
+    relevant: z
+      .boolean()
+      .describe("Whether the dataset is relevant to the user's question"),
+  })
+);
 
 const structuredSummativeModel = openai.withStructuredOutput(SummarySchema);
 
@@ -79,8 +92,10 @@ async function setupNode(state: typeof DatasetEvalAnnotation.State) {
 
   // Extract any VALID extra links
   const extras = dataset.extras
+    // Filter out non-string values
+    .filter(extra => typeof extra.value === 'string')
     // Filter to links
-    .filter(extra => extra.value.includes('http'))
+    .filter(extra => (extra.value as string).includes('http'))
     // Map to pending resources format
     .map(extra => ({
       url: extra.value,
@@ -99,7 +114,36 @@ async function setupNode(state: typeof DatasetEvalAnnotation.State) {
   return { pendingResources };
 }
 
-async function evalNode(state: typeof ResourceEvaluationAnnotation.State) {
+async function datasetEvalNode(state: typeof DatasetEvalAnnotation.State) {
+  const { dataset, userQuery } = state;
+
+  const prompt = await EVAL_DATASET_PROMPT.formatMessages({
+    userQuery,
+    datasetMetadata: JSON.stringify({
+      name: dataset.name,
+      description: dataset.notes,
+      title: dataset.title,
+      type: dataset.type,
+      state: dataset.state,
+      // Skip resources, as they will be evaluated individually
+    }),
+  });
+
+  const { relevant } = await structuredModel.invoke(prompt);
+
+  if (!relevant) {
+    console.log(
+      "🔍 [DATASET EVAL] Dataset is not relevant to the user's question",
+      dataset.name
+    );
+  }
+
+  return { shouldInvestigateResources: relevant };
+}
+
+async function resourceEvalNode(
+  state: typeof ResourceEvaluationAnnotation.State
+) {
   const { resource, userQuery, datasetName } = state;
 
   // Call the per-resource eval-agent
@@ -141,27 +185,43 @@ async function summativeEvaluationNode(
 
 /* EDGES */
 
-async function fanOutEdge(state: typeof DatasetEvalAnnotation.State) {
-  const { pendingResources: resources, userQuery, dataset } = state;
+function shouldContinueToResourceEval(
+  state: typeof DatasetEvalAnnotation.State
+) {
+  const {
+    shouldInvestigateResources,
+    pendingResources: resources,
+    userQuery,
+    dataset,
+  } = state;
 
-  if (resources.length === 0) {
+  if (!shouldInvestigateResources || resources.length === 0) {
     return END;
   }
 
   return resources.map(
     resource =>
-      new Send('eval', { resource, userQuery, datasetName: dataset.name })
+      new Send('resourceEval', {
+        resource,
+        userQuery,
+        datasetName: dataset.name,
+      })
   );
 }
 
 const graph = new StateGraph(DatasetEvalAnnotation)
   .addNode('setup', setupNode)
-  .addNode('eval', evalNode)
+  .addNode('datasetEval', datasetEvalNode)
+  .addNode('resourceEval', resourceEvalNode)
   .addNode('formatEval', summativeEvaluationNode, { defer: true })
 
   .addEdge(START, 'setup')
-  .addConditionalEdges('setup', fanOutEdge, ['eval', END])
-  .addEdge('eval', 'formatEval')
+  .addEdge('setup', 'datasetEval')
+  .addConditionalEdges('datasetEval', shouldContinueToResourceEval, [
+    'resourceEval',
+    END,
+  ])
+  .addEdge('resourceEval', 'formatEval')
   .addEdge('formatEval', END)
 
   .compile();

@@ -14,8 +14,7 @@ export const DATA_GOV_USER_QUERY_FORMATTING_PROMPT =
 - Make the scope explicit:
   - If the user does not specify scope, assume the entire United States.
 - Make the answer type explicit: numeric (percentage, counts, averages, rankings) or categorical (lists, classifications).
-- If no timeframe is given, assume the most recent available data.
-- Make clear what approximations are acceptable (e.g., age 65+ instead of 80+, state-level instead of U.S.-wide).
+- Make clear that approximations are acceptable (e.g., age 65+ instead of 80+, state-level instead of U.S.-wide).
 - Be clear and concise: the expanded query should read like instructions for what data to retrieve or compute.
 
 ### Output Format
@@ -98,7 +97,7 @@ export const DATA_GOV_FINAL_EVALUATION_PROMPT = ChatPromptTemplate.fromMessages(
 
       ### Output Format
       - **Summary**: A clear, concise summary of the resulting data. Include exact numbers and percentages where applicable. Structure it as an answer to the user's question.
-      - **Table**: The resulting table of data. Leave this in as raw a format as possible.
+      - **Table**: The resulting table of data. Leave this in as raw a format as possible. Do not wrap in backticks, but leave in Github-style markdown table formatting.
       - **Queries**: The SQL queries that were executed.
       - **Dataset**: The dataset that was used to answer the question, including the ID, title, and download link. THE DOWNLOAD LINK MUST BE EXACTLY THE SAME AS THE ONE IN THE FINAL DATASET.
       - **Useful links**: Any and all useful links you see in the full package metadata, along with a brief title-style description for them.
@@ -106,3 +105,22 @@ export const DATA_GOV_FINAL_EVALUATION_PROMPT = ChatPromptTemplate.fromMessages(
     },
   ]
 );
+
+/**
+ * Not really a prompt, but nicer to have here.
+ */
+export const NO_DATASET_FOUND_MESSAGE = `⚠️ **No Matching Dataset Found**
+
+We couldn’t find a dataset that directly answers your question.
+This might be because:
+
+- The scope of your question is too narrow or too broad.
+- Relevant datasets may not be available in the current catalog.
+- The data could exist under different terminology or categories.
+
+### Suggestions
+- Try rephrasing your question with simpler or broader keywords.
+- Experiment with related terms (e.g., "population" → "demographics").
+- Narrow the scope (e.g., a specific state instead of the entire U.S.).
+- Browse available categories to see if a related dataset exists.
+`;

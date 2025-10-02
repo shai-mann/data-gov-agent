@@ -168,7 +168,7 @@ async function modelNode(state: typeof DatasetEvalAnnotation.State) {
  * Updates the query count after the SQL query tool is used.
  */
 async function postToolNode(state: typeof DatasetEvalAnnotation.State) {
-  const { messages, queryCount, connectionId } = state;
+  const { messages, connectionId } = state;
 
   const sqlQueryToolMessages = getToolMessages(
     messages,
@@ -176,13 +176,15 @@ async function postToolNode(state: typeof DatasetEvalAnnotation.State) {
     getLastAiMessageIndex(messages) + 1
   );
 
-  const newCount = queryCount + sqlQueryToolMessages.length;
+  const queries = (
+    messages.at(getLastAiMessageIndex(messages)) as AIMessage
+  )?.tool_calls
+    ?.filter(t => t.name === 'sqlQuery')
+    .map(t => t.args.query);
 
-  logSubState(
-    connectionId,
-    'DatasetQuery',
-    `Executed SQL query (${newCount}/${MAX_QUERY_COUNT})`
-  );
+  queries?.forEach(q => {
+    logSubState(connectionId, 'DatasetQuery', `Executing SQL query: "${q}"`);
+  });
 
   return {
     // Because of the reducer, this is additive
