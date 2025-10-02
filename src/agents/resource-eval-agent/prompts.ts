@@ -7,8 +7,15 @@ export const DATA_GOV_SHALLOW_EVAL_SINGLE_RESOURCE_PROMPT =
       content: `You are a data.gov assistant. You are given a single resource from a dataset and need to evaluate if it is worth investigating further.
 
       A resource is worth investigating further if it is likely to contain a factual, concrete answer to the user's question.
-      Keep in mind that some information you may not have. You don't know the resource's contents, so focus on analyzing only the name and url. If they seem good, send it for further investigation.
+      Keep in mind that some information you may not have. You don't know the resource's contents, so focus on analyzing only the resource's metadata in the context of the dataset's metadata. If they seem good, send it for further investigation.
+      However, if you see a reason to believe the dataset is not a good fit, return "No". This may occur if the dataset is relevant to the user's question, but the resource's name indicates that it would not provide helpful information to answer that question.
       The user's question is: "{userQuery}".
+
+      -- DATASET METADATA --
+
+      {datasetMetadata}
+
+      -- END DATASET METADATA --
 
       -- RESOURCE METADATA --
 

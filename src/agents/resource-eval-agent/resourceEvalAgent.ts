@@ -12,6 +12,7 @@ import { ResourceEvaluationSchema, ResourceEvaluation } from './annotations';
 /* ANNOTATIONS */
 
 export const ResourceEvaluationAnnotation = Annotation.Root({
+  datasetName: Annotation<string>(),
   resource: Annotation<PendingResource>,
   userQuery: Annotation<string>(),
 
@@ -41,7 +42,7 @@ const structuredDeepEvalModel = openai.withStructuredOutput(
 async function evaluateResourceNode(
   state: typeof ResourceEvaluationAnnotation.State
 ) {
-  const { resource, userQuery } = state;
+  const { resource, userQuery, datasetName } = state;
 
   const prompt =
     await DATA_GOV_SHALLOW_EVAL_SINGLE_RESOURCE_PROMPT.formatMessages({
@@ -49,6 +50,9 @@ async function evaluateResourceNode(
         url: resource.url,
         name: resource.name,
         description: resource.description,
+      }),
+      datasetMetadata: JSON.stringify({
+        name: datasetName,
       }),
       userQuery,
     });

@@ -31,7 +31,10 @@ export const sqlQueryTool = tool(
       return { success: true, output };
     } catch (err) {
       console.error('🔍 [QUERY] Error executing query: ', err);
-      return `Error executing query: ${err instanceof Error ? err.message : 'Unknown'}`;
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Unknown',
+      };
     }
   },
   {

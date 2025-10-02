@@ -15,14 +15,7 @@ import {
   DATA_GOV_USER_QUERY_FORMATTING_PROMPT,
 } from './prompts';
 import { DatasetWithEvaluation } from '@agents/search-agent/searchAgent';
-
-/*
-// TODO: Follow up on this comment - do I still need it?
-NOTE: This **was** a core agent (running exactly as you see below), but due to token limitations (20k tokens/min for my account),
-I'm submitting the separate agents for search, eval, and query, rather than this full combined agent.
-
-This code still exists so you can see how it would all get stitched together, but the project itself lives in the other agent files.
-*/
+import { logStateTransition, logSubState } from '@lib/ws-logger';
 
 /* ANNOTATIONS */
 
@@ -35,6 +28,7 @@ const GovResearcherAnnotation = Annotation.Root({
   userQuery: Annotation<string>(),
   summary: Annotation<z.infer<typeof QueryAgentSummarySchema>>(),
   output: Annotation<string>(),
+  connectionId: Annotation<string | undefined>(),
 });
 
 /* MODELS */
@@ -50,25 +44,33 @@ const formattingStructuredModel = openai.withStructuredOutput(
 async function userQueryFormattingNode(
   state: typeof GovResearcherAnnotation.State
 ) {
-  const { userQuery } = state;
+  const { userQuery, connectionId } = state;
+
+  logStateTransition(connectionId, 'START', 'QueryFormatting');
+
   const prompt = await DATA_GOV_USER_QUERY_FORMATTING_PROMPT.formatMessages({
     query: userQuery,
   });
 
-  console.log('🔍 [CORE] Formatting user query...');
+  logSubState(connectionId, 'QueryFormatting', 'Analyzing and refining query');
 
   const result = await formattingStructuredModel.invoke(prompt);
 
-  console.log('🔍 [CORE] Constructed more specific user query: ', result.query);
+  logSubState(connectionId, 'QueryFormatting', 'Query formatted successfully', {
+    formattedQuery: result.query,
+  });
 
   return { userQuery: result.query };
 }
 
 async function searchNode(state: typeof GovResearcherAnnotation.State) {
-  const { userQuery } = state;
+  const { userQuery, connectionId } = state;
+
+  logStateTransition(connectionId, 'QueryFormatting', 'DatasetSearch');
 
   const { selectedDataset } = await searchAgent.invoke({
     userQuery,
+    connectionId,
   });
 
   return {
@@ -77,24 +79,28 @@ async function searchNode(state: typeof GovResearcherAnnotation.State) {
 }
 
 async function queryNode(state: typeof GovResearcherAnnotation.State) {
-  const { dataset, userQuery } = state;
+  const { dataset, userQuery, connectionId } = state;
 
   if (!dataset) {
     // This should never happen, but for typecheck we handle it.
     throw new Error('[CORE] No dataset selected at querying node');
   }
 
+  logStateTransition(connectionId, 'DatasetSearch', 'DatasetQuery');
+
   const { summary } = await queryAgent.invoke(
     {
       dataset,
       userQuery,
+      connectionId,
     },
     {
-      recursionLimit: 30, // Query agent often needs some extra iterations
+      // Query agent often needs some extra iterations
+      // It also has it's own internal recursion limit, which doesn't error out, but returns a message indicating that it couldn't complete.
+      recursionLimit: 50,
     }
   );
 
-  console.log('🔍 [CORE] Exiting workflow');
   return {
     summary,
   };
@@ -103,15 +109,19 @@ async function queryNode(state: typeof GovResearcherAnnotation.State) {
 async function emitFinalEvaluationNode(
   state: typeof GovResearcherAnnotation.State
 ) {
-  const { summary, dataset, userQuery } = state;
+  const { summary, dataset, userQuery, connectionId } = state;
 
   if (!dataset) {
     // Again, this should never happen, but for typecheck we handle it.
     throw new Error('No final dataset selected');
   }
 
+  logStateTransition(connectionId, 'DatasetQuery', 'FinalEvaluation');
+
+  logSubState(connectionId, 'FinalEvaluation', 'Fetching full dataset package');
   const fullPackage = await getPackage(dataset.id);
 
+  logSubState(connectionId, 'FinalEvaluation', 'Generating final response');
   const prompt = await DATA_GOV_FINAL_EVALUATION_PROMPT.formatMessages({
     userQuery,
     summary: JSON.stringify(summary),
@@ -120,6 +130,8 @@ async function emitFinalEvaluationNode(
   });
 
   const response = await openai.invoke(prompt);
+
+  logSubState(connectionId, 'FinalEvaluation', 'Response complete');
 
   return {
     output: response.content,
@@ -137,7 +149,6 @@ async function shouldContinueToQuery(
     return 'query';
   }
 
-  console.log('🔍 [CORE] No dataset selected, exiting workflow');
   return END;
 }
 

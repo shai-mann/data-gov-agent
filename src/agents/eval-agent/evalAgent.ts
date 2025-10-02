@@ -28,6 +28,7 @@ const DatasetEvalAnnotation = Annotation.Root({
     default: () => [],
   }),
   summary: Annotation<DatasetSummary>,
+  connectionId: Annotation<string | undefined>(),
 });
 
 /* MODELS */
@@ -99,10 +100,11 @@ async function setupNode(state: typeof DatasetEvalAnnotation.State) {
 }
 
 async function evalNode(state: typeof ResourceEvaluationAnnotation.State) {
-  const { resource, userQuery } = state;
+  const { resource, userQuery, datasetName } = state;
 
   // Call the per-resource eval-agent
   const { evaluation } = await resourceEvalAgent.invoke({
+    datasetName,
     resource,
     userQuery,
   });
@@ -134,26 +136,22 @@ async function summativeEvaluationNode(
 
   const summary = await structuredSummativeModel.invoke(prompt);
 
-  console.log('🔍 [EVAL] Exiting workflow');
   return { summary };
 }
 
 /* EDGES */
 
 async function fanOutEdge(state: typeof DatasetEvalAnnotation.State) {
-  const { pendingResources: resources, userQuery } = state;
+  const { pendingResources: resources, userQuery, dataset } = state;
 
   if (resources.length === 0) {
-    console.log('🔍 [EVAL] No resources found - exiting workflow');
     return END;
   }
 
-  console.log(
-    '🔍 [EVAL] Kicking off ',
-    resources.length,
-    'resource evaluations'
+  return resources.map(
+    resource =>
+      new Send('eval', { resource, userQuery, datasetName: dataset.name })
   );
-  return resources.map(resource => new Send('eval', { resource, userQuery }));
 }
 
 const graph = new StateGraph(DatasetEvalAnnotation)
