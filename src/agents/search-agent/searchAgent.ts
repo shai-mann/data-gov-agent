@@ -21,7 +21,7 @@ import { logSubState } from '@lib/ws-logger';
 import evalAgent from '@agents/eval-agent/evalAgent';
 import { AIMessage } from 'langchain';
 
-const MAX_QUERY_COUNT = 50; // To prevent infinite loops, we let it try 15 different queries before giving up.
+const MAX_QUERY_COUNT = 25; // To prevent infinite loops, we let it try 25 different queries before giving up.
 
 // TODO: replace the type in lib/annotations with this one, and move ancillary types there as well.
 export type DatasetWithEvaluation = DatasetSummary & {
