@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { WSContext } from 'hono/ws';
 
 // Store active WebSocket connections by connection ID
