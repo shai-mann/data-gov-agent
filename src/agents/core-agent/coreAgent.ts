@@ -60,6 +60,8 @@ async function userQueryFormattingNode(
     formattedQuery: result.query,
   });
 
+  console.log('🔍 [CORE] Formatted query:', result.query);
+
   return { userQuery: result.query };
 }
 

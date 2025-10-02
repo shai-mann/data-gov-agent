@@ -14,8 +14,7 @@ export const DATA_GOV_USER_QUERY_FORMATTING_PROMPT =
 - Make the scope explicit:
   - If the user does not specify scope, assume the entire United States.
 - Make the answer type explicit: numeric (percentage, counts, averages, rankings) or categorical (lists, classifications).
-- If no timeframe is given, assume the most recent available data.
-- Make clear what approximations are acceptable (e.g., age 65+ instead of 80+, state-level instead of U.S.-wide).
+- Make clear that approximations are acceptable (e.g., age 65+ instead of 80+, state-level instead of U.S.-wide).
 - Be clear and concise: the expanded query should read like instructions for what data to retrieve or compute.
 
 ### Output Format

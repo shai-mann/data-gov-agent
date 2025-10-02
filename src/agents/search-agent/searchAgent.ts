@@ -250,16 +250,20 @@ function shouldContinueToTools(state: typeof DatasetSearchAnnotation.State) {
 function shouldContinueToEval(state: typeof DatasetSearchAnnotation.State) {
   const { pendingDatasets, userQuery, datasets, connectionId } = state;
 
-  if (pendingDatasets.length === 0) {
+  // De-duplicate the pending datasets, and filter out the datasets that have already been evaluated.
+  const newPendingDatasets = [...new Set(pendingDatasets)].filter(
+    id => !datasets.some(d => d.id === id)
+  );
+
+  if (newPendingDatasets.length === 0) {
     return 'model';
   }
 
-  return pendingDatasets.map(
+  return newPendingDatasets.map(
     id =>
       new Send('eval', {
         datasetId: id,
         userQuery,
-        datasets,
         connectionId,
       })
   );

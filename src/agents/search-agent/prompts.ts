@@ -22,19 +22,21 @@ Follow this workflow carefully:
   - Attempt to come up with 5-7 good queries to try, each using different keywords and search patterns.
   - Good keywords are NOT just parts of the user's query. These are government datasets, so using government-specific keywords is more likely to find relevant datasets.
 2. **Send a batch of packageSearch calls** with the queries you came up with.
+  - Try and vary the government-specific keywords used, so you can hit a wider range of datasets.
 
 Guidelines for query construction:
 - Avoid searching for a specific rather than a general term. For example, if the user is asking about a specific age range, look for data segmented by age, rather than data just for that age group.
 - Using the special characters like '+' is good for indicating that a keyword is important. See more details below.
-- Try to use 1-2 or maximumum 3 keywords in a given query.
+- Restrict to 1-2 keywords maximum per query.
 
 QUERIES YOU HAVE ALREADY TRIED (all of these returned no relevant datasets):
 {pastQueries}
 
 IMPORTANT:
-- Do not repeat past queries.
+- DO NOT REPEAT PAST QUERIES.
+- DO NOT SEARCH FOR SPECIFIC YEARS.
 - Use precise keywords; avoid vague or overly broad terms, but don't be so specific that you miss relevant datasets.
-- Use limited keywords; avoid long search strings.
+- Restrict to 1-2 keywords maximum per query.
 `,
   },
   {
