@@ -64,24 +64,26 @@ title:europe || title:africa will look for datasets containing “europe” or �
   },
 ]);
 
-export const DATA_GOV_SEARCH_REMINDER_PROMPT = ChatPromptTemplate.fromMessages([
-  {
-    role: 'system',
-    content: `Examine the below evaluations. Are these datasets a good fit for the user's question? If so, select the best one and return it.
+export const DATA_GOV_SEARCH_SELECTION_PROMPT = ChatPromptTemplate.fromMessages(
+  [
+    {
+      role: 'system',
+      content: `Examine the below evaluations. Are these datasets a good fit for the user's question? If so, select the best one and return it.
 
     ### Output format:
     {{
       id: string,
     }}
     `,
-  },
-  {
-    role: 'user',
-    content: '{query}',
-  },
-  {
-    role: 'system',
-    content: `The evaluations are:
+    },
+    {
+      role: 'user',
+      content: '{query}',
+    },
+    {
+      role: 'system',
+      content: `The evaluations are:
     {evaluations}`,
-  },
-]);
+    },
+  ]
+);

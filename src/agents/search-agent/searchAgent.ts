@@ -11,7 +11,7 @@ import { packageSearch, packageShow } from '@tools';
 import { openai } from '@llms';
 import {
   DATA_GOV_SEARCH_PROMPT,
-  DATA_GOV_SEARCH_REMINDER_PROMPT as DATA_GOV_SEARCH_SELECTION_PROMPT,
+  DATA_GOV_SEARCH_SELECTION_PROMPT,
 } from './prompts';
 import { getLastAiMessageIndex, getToolMessages } from '@lib/utils';
 import { z } from 'zod';
