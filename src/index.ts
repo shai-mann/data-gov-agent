@@ -42,17 +42,20 @@ app.get(
           })
         );
         console.log(
-          `WebSocket ${isReconnect ? 'reconnected' : 'connected'}: ${connectionId}`
+          `[WebSocket] ${isReconnect ? 'Reconnected' : 'Connected'}: ${connectionId}`
         );
       },
       onMessage(event) {
-        console.log(`Message from ${connectionId}:`, event.data);
+        // Only log if it's an actual message, not just keepalive
+        if (event.data && event.data !== 'ping') {
+          console.log(`[WebSocket] Message from ${connectionId}`);
+        }
       },
       onClose() {
-        console.log(`WebSocket disconnected: ${connectionId}`);
+        console.log(`[WebSocket] Disconnected: ${connectionId}`);
       },
       onError(event) {
-        console.error(`WebSocket error for ${connectionId}:`, event);
+        console.error(`[WebSocket] Error ${connectionId}:`, event);
       },
     };
   })
@@ -72,9 +75,6 @@ app.post('/research', async c => {
       return c.json({ error: 'Query parameter is required' }, 400);
     }
 
-    console.log('Connection ID:', connectionId);
-
-    // Log the start of the research
     logInfo(connectionId, 'Starting research query', { query });
 
     const result = await coreAgent.invoke({
@@ -89,8 +89,6 @@ app.post('/research', async c => {
       result: result.output,
     });
   } catch (error) {
-    console.error('Data Gov Agent error:', error);
-
     // Log error to WebSocket if connection exists
     const { connectionId } = await c.req.json();
     logError(

@@ -60,12 +60,10 @@ async function userQueryFormattingNode(
     query: userQuery,
   });
 
-  console.log('🔍 [CORE] Formatting user query...');
   logSubState(connectionId, 'QueryFormatting', 'Analyzing and refining query');
 
   const result = await formattingStructuredModel.invoke(prompt);
 
-  console.log('🔍 [CORE] Constructed more specific user query: ', result.query);
   logSubState(connectionId, 'QueryFormatting', 'Query formatted successfully', {
     formattedQuery: result.query,
   });
@@ -109,7 +107,6 @@ async function queryNode(state: typeof GovResearcherAnnotation.State) {
     }
   );
 
-  console.log('🔍 [CORE] Exiting workflow');
   return {
     summary,
   };
@@ -158,7 +155,6 @@ async function shouldContinueToQuery(
     return 'query';
   }
 
-  console.log('🔍 [CORE] No dataset selected, exiting workflow');
   return END;
 }
 

@@ -26,7 +26,6 @@ export interface WSMessage {
  */
 export function registerWSConnection(connectionId: string, ws: WSContext) {
   wsConnections.set(connectionId, ws);
-  console.log(`[WS] Registered connection: ${connectionId}`);
 }
 
 /**
@@ -34,7 +33,6 @@ export function registerWSConnection(connectionId: string, ws: WSContext) {
  */
 export function unregisterWSConnection(connectionId: string) {
   wsConnections.delete(connectionId);
-  console.log(`[WS] Unregistered connection: ${connectionId}`);
 }
 
 /**
@@ -75,6 +73,7 @@ export function logStateTransition(
   toState: string,
   metadata?: any
 ) {
+  console.log(`[State] ${fromState} → ${toState}`);
   sendToConnection(connectionId, {
     type: WSMessageType.STATE_TRANSITION,
     timestamp: new Date().toISOString(),
@@ -84,7 +83,6 @@ export function logStateTransition(
       ...metadata,
     },
   });
-  console.log(`[State Transition] ${fromState} → ${toState}`);
 }
 
 /**
@@ -96,6 +94,7 @@ export function logSubState(
   action: string,
   metadata?: any
 ) {
+  console.log(`  [${state}] ${action}`);
   sendToConnection(connectionId, {
     type: WSMessageType.SUB_STATE_LOG,
     timestamp: new Date().toISOString(),
@@ -105,7 +104,6 @@ export function logSubState(
       ...metadata,
     },
   });
-  console.log(`[Sub-State] ${state}: ${action}`);
 }
 
 /**
@@ -116,6 +114,7 @@ export function logInfo(
   message: string,
   metadata?: any
 ) {
+  console.log(`[Info] ${message}`);
   sendToConnection(connectionId, {
     type: WSMessageType.INFO,
     timestamp: new Date().toISOString(),
@@ -124,7 +123,6 @@ export function logInfo(
       ...metadata,
     },
   });
-  console.log(`[Info] ${message}`);
 }
 
 /**
@@ -135,6 +133,7 @@ export function logError(
   error: string | Error,
   context?: any
 ) {
+  console.error(`[Error]`, error);
   sendToConnection(connectionId, {
     type: WSMessageType.ERROR,
     timestamp: new Date().toISOString(),
@@ -144,5 +143,4 @@ export function logError(
       context,
     },
   });
-  console.error(`[Error]`, error);
 }

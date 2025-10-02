@@ -135,7 +135,6 @@ async function summativeEvaluationNode(
 
   const summary = await structuredSummativeModel.invoke(prompt);
 
-  console.log('🔍 [EVAL] Exiting workflow');
   return { summary };
 }
 
@@ -145,15 +144,9 @@ async function fanOutEdge(state: typeof DatasetEvalAnnotation.State) {
   const { pendingResources: resources, userQuery } = state;
 
   if (resources.length === 0) {
-    console.log('🔍 [EVAL] No resources found - exiting workflow');
     return END;
   }
 
-  console.log(
-    '🔍 [EVAL] Kicking off ',
-    resources.length,
-    'resource evaluations'
-  );
   return resources.map(resource => new Send('eval', { resource, userQuery }));
 }
 

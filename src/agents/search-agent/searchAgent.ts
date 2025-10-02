@@ -76,8 +76,6 @@ async function setupNode(state: typeof DatasetSearchAnnotation.State) {
     throw new Error('Must provide a user query');
   }
 
-  console.log('🔍 Initializing dataset searching agent');
-
   const prompt = await DATA_GOV_SEARCH_PROMPT.formatMessages({
     query: userQuery,
   });
@@ -93,8 +91,6 @@ async function setupNode(state: typeof DatasetSearchAnnotation.State) {
 async function modelNode(state: typeof DatasetSearchAnnotation.State) {
   const { messages } = state;
 
-  console.log('🔍 [SEARCH] Calling model...');
-
   const result = await model.invoke(messages);
 
   return {
@@ -106,7 +102,6 @@ async function modelNode(state: typeof DatasetSearchAnnotation.State) {
  * Node to process calls from tools and perform additional post-processing.
  */
 async function postToolsNode(state: typeof DatasetSearchAnnotation.State) {
-  console.log('⚖️ [SEARCH] Tool post-processing Node');
   const { messages, datasets, connectionId } = state;
 
   // Since it could be a batch of tool calls, we need to find all tool calls since the last AI message
@@ -162,12 +157,6 @@ async function shallowEvalNode(state: typeof EvalDatasetAnnotation.State) {
     evaluations,
   };
 
-  console.log(
-    '🔍 [SEARCH] Evaluated dataset: ',
-    datasetId,
-    datasetSelection.bestResource
-  );
-
   logSubState(connectionId, 'DatasetSearch', `Dataset ${datasetId} evaluation complete`, {
     bestResource: datasetSelection.bestResource,
   });
@@ -185,18 +174,11 @@ async function trySelectNode(state: typeof DatasetSearchAnnotation.State) {
   const newDatasets = datasets.filter(d => pendingDatasets.includes(d.id));
 
   if (newDatasets.length === 0) {
-    console.log('🔍 [SEARCH] No datasets to evaluate, skipping selection');
     return {
       selectedDataset: null,
       pendingDatasets: [],
     };
   }
-
-  console.log(
-    '🔍 [SEARCH] Attempting to select new dataset from',
-    newDatasets.length,
-    'datasets'
-  );
 
   logSubState(connectionId, 'DatasetSearch', `Selecting best dataset from ${newDatasets.length} candidates`);
 
@@ -241,8 +223,6 @@ function shouldContinueToTools(state: typeof DatasetSearchAnnotation.State) {
     return 'tools';
   }
 
-  // If no tools were called, the AI is presumed to have found all the datasets it needed to find
-  console.log('🔍 [SEARCH] Exiting search workflow');
   return END;
 }
 
@@ -257,7 +237,6 @@ function shouldContinueToEval(state: typeof DatasetSearchAnnotation.State) {
     return 'model';
   }
 
-  console.log('🔍 [SEARCH] Evaluating', pendingDatasets.length, 'datasets');
   return pendingDatasets.map(
     id => new Send('shallowEval', { datasetId: id, userQuery, datasets, connectionId })
   );
@@ -267,11 +246,9 @@ function shouldContinueToModel(state: typeof DatasetSearchAnnotation.State) {
   const { selectedDataset } = state;
 
   if (selectedDataset) {
-    console.log('🔍 [SEARCH] Selected dataset: ', selectedDataset);
     return END;
   }
 
-  console.log('🔍 [SEARCH] No dataset selected, continuing to model');
   return 'model';
 }
 

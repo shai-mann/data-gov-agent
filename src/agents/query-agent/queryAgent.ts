@@ -71,7 +71,6 @@ const tableNameStructuredModel = openai.withStructuredOutput(
 async function setupNode(state: typeof DatasetEvalAnnotation.State) {
   const { dataset, userQuery, connectionId } = state;
 
-  console.log('🔍 [QUERY] Initializing...');
   logSubState(
     connectionId,
     'DatasetQuery',
@@ -109,7 +108,6 @@ async function setupNode(state: typeof DatasetEvalAnnotation.State) {
 
   // Construct the table in DuckDB and load the dataset into it
   try {
-    console.log('🔍 [QUERY] Creating table:', table);
     await conn.run(
       `CREATE TABLE ${table} AS SELECT * FROM read_csv_auto('${tmpPath}')`
     );
@@ -150,13 +148,7 @@ async function setupNode(state: typeof DatasetEvalAnnotation.State) {
 }
 
 async function modelNode(state: typeof DatasetEvalAnnotation.State) {
-  console.log('🔍 [QUERY] Evaluating...');
-
   if (state.queryCount >= MAX_QUERY_COUNT) {
-    console.log(
-      '🔍 [QUERY] Exiting workflow (model) - query count is at: ',
-      state.queryCount
-    );
     return {}; // Skip this model call, so the workflow will exit.
   }
 
@@ -185,8 +177,6 @@ async function postToolNode(state: typeof DatasetEvalAnnotation.State) {
   );
 
   const newCount = queryCount + sqlQueryToolMessages.length;
-
-  console.log('🔍 [QUERY] Post-tool node, query count is now at: ', newCount);
 
   logSubState(
     connectionId,
@@ -217,12 +207,8 @@ async function evaluateQueryNode(state: typeof DatasetEvalAnnotation.State) {
     remainingQueryCount: MAX_QUERY_COUNT - queryCount,
   });
 
-  console.log('🔍 [QUERY] Evaluating last query...');
-
   // Not using the model with tools here because it shouldn't use any tools.
   const result = await openai.invoke([...history, ...prompt]);
-
-  console.log('🔍 [QUERY] Evaluated query: ', result.content);
 
   return {
     messages: result,
@@ -233,8 +219,6 @@ async function evaluateQueryNode(state: typeof DatasetEvalAnnotation.State) {
  * Formulate a structured output including summary, table, and queries.
  */
 async function outputNode(state: typeof DatasetEvalAnnotation.State) {
-  console.log('🔍 [EVAL] Structuring output...');
-
   const { messages, userQuery } = state;
   const lastMessage = messages.at(-1) as AIMessage;
 
@@ -264,7 +248,6 @@ function shouldContinue(state: typeof DatasetEvalAnnotation.State) {
     return 'toolNode';
   }
 
-  console.log('🔍 [QUERY] Exiting workflow');
   return 'output';
 }
 
