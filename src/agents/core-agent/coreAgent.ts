@@ -46,17 +46,17 @@ async function userQueryFormattingNode(
 ) {
   const { userQuery, connectionId } = state;
 
-  logStateTransition(connectionId, 'START', 'QueryFormatting');
+  logStateTransition(connectionId, 'START', 'Initializing');
 
   const prompt = await DATA_GOV_USER_QUERY_FORMATTING_PROMPT.formatMessages({
     query: userQuery,
   });
 
-  logSubState(connectionId, 'QueryFormatting', 'Analyzing and refining query');
+  logSubState(connectionId, 'Initializing', 'Analyzing query');
 
   const result = await formattingStructuredModel.invoke(prompt);
 
-  logSubState(connectionId, 'QueryFormatting', 'Query formatted successfully', {
+  logSubState(connectionId, 'Initializing', 'Query analysis complete', {
     formattedQuery: result.query,
   });
 
@@ -70,10 +70,16 @@ async function searchNode(state: typeof GovResearcherAnnotation.State) {
 
   logStateTransition(connectionId, 'QueryFormatting', 'DatasetSearch');
 
-  const { selectedDataset } = await searchAgent.invoke({
-    userQuery,
-    connectionId,
-  });
+  const { selectedDataset } = await searchAgent.invoke(
+    {
+      userQuery,
+      connectionId,
+    },
+    {
+      // Search agent often needs some extra iterations, but it has it's own safe recursion break.
+      recursionLimit: 50,
+    }
+  );
 
   return {
     dataset: selectedDataset,
@@ -114,8 +120,10 @@ async function emitFinalEvaluationNode(
   const { summary, dataset, userQuery, connectionId } = state;
 
   if (!dataset) {
-    // Again, this should never happen, but for typecheck we handle it.
-    throw new Error('No final dataset selected');
+    // Emit a formatted message indicating that no dataset was selected.
+    return {
+      output: `We couldn't find a dataset that could answer your question. Try adjusting the question or scope slightly, although we may be struggling due to lack of datasets available.`,
+    };
   }
 
   logStateTransition(connectionId, 'DatasetQuery', 'FinalEvaluation');
