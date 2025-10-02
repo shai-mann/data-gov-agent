@@ -102,7 +102,7 @@ curl -X POST http://localhost:3000/v1/data-gov/search \
 
 ## Project Structure
 
-> **Note on Import Paths**: This project uses relative imports (e.g., `../../lib/utils.ts`) rather than aliased imports (e.g., `@/lib/utils`). While aliased imports would improve readability, they are not easily configurable for serverless deployment environments without additional build complexity. I apologize for any inconvenience this may cause when navigating the codebase.
+> **Note on Import Paths**: This project uses relative imports (e.g., `../../lib/utils.ts`) rather than aliased imports (e.g., `@/lib/utils`). I did everything with aliased imports and it was beautiful, but then I had to remove them to make the app servable on Vercel. There were other solutions, they would just involve deeper rewrites.
 
 ```
 ├── src/
