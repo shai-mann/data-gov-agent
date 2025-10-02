@@ -15,10 +15,10 @@ import {
 } from './prompts';
 import { getLastAiMessageIndex, getToolMessages } from '@lib/utils';
 import { z } from 'zod';
-import shallowEvalAgent from '@agents/eval-agent/evalAgent';
 import { DatasetSummary } from '../eval-agent/annotations';
 import { ResourceEvaluation } from '../resource-eval-agent/annotations';
 import { logSubState } from '@lib/ws-logger';
+import evalAgent from '@agents/eval-agent/evalAgent';
 
 // TODO: replace the type in lib/annotations with this one, and move ancillary types there as well.
 export type DatasetWithEvaluation = DatasetSummary & {
@@ -124,7 +124,7 @@ async function postToolsNode(state: typeof DatasetSearchAnnotation.State) {
 /**
  * Node to evaluate a dataset.
  */
-async function shallowEvalNode(state: typeof EvalDatasetAnnotation.State) {
+async function evalNode(state: typeof EvalDatasetAnnotation.State) {
   const { datasetId, userQuery, connectionId } = state;
 
   const dataset = await packageShow.invoke({
@@ -137,7 +137,7 @@ async function shallowEvalNode(state: typeof EvalDatasetAnnotation.State) {
     `Evaluating dataset: ${dataset.name}`
   );
 
-  const { summary, evaluations } = await shallowEvalAgent.invoke({
+  const { summary, evaluations } = await evalAgent.invoke({
     dataset,
     userQuery,
     connectionId,
@@ -256,7 +256,7 @@ function shouldContinueToEval(state: typeof DatasetSearchAnnotation.State) {
 
   return pendingDatasets.map(
     id =>
-      new Send('shallowEval', {
+      new Send('eval', {
         datasetId: id,
         userQuery,
         datasets,
@@ -279,18 +279,15 @@ const graph = new StateGraph(DatasetSearchAnnotation)
   .addNode('model', modelNode)
   .addNode('tools', new ToolNode(tools))
   .addNode('postTools', postToolsNode)
-  .addNode('shallowEval', shallowEvalNode)
+  .addNode('eval', evalNode)
   // Defer the try select node, so the shallow eval nodes are forced to fan-in before it runs.
   .addNode('trySelect', trySelectNode, { defer: true })
 
   .addEdge(START, 'model')
   .addConditionalEdges('model', shouldContinueToTools, ['tools', 'model'])
   .addEdge('tools', 'postTools')
-  .addConditionalEdges('postTools', shouldContinueToEval, [
-    'shallowEval',
-    'model',
-  ])
-  .addEdge('shallowEval', 'trySelect')
+  .addConditionalEdges('postTools', shouldContinueToEval, ['eval', 'model'])
+  .addEdge('eval', 'trySelect')
   .addConditionalEdges('trySelect', shouldContinueToModel, ['model', END])
 
   .compile();

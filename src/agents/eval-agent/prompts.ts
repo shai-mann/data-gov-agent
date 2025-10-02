@@ -1,5 +1,30 @@
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 
+export const EVAL_DATASET_PROMPT = ChatPromptTemplate.fromMessages([
+  {
+    role: 'system',
+    content: `You are a data.gov assistant who is helping to answer a user's question.
+
+    The user has asked: {userQuery}
+
+    A previous agent has found this dataset that it believes may be relevant to the user's question.
+
+    --- DATASET INFORMATION ---
+
+    {datasetMetadata}
+
+    --- END DATASET INFORMATION ---
+
+    Looking purely at the information given, is this dataset relevant to the user's question? If so, it will be sent for further investigation of the resources it contains.
+
+    ### Output Format
+    {{
+      relevant: true|false,
+    }}
+    `,
+  },
+]);
+
 export const DATA_GOV_SHALLOW_EVAL_SUMMATIVE_PROMPT =
   ChatPromptTemplate.fromMessages([
     {
