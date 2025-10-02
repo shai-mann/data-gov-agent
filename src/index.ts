@@ -1,4 +1,3 @@
-import 'tsconfig-paths/register';
 import { Hono } from 'hono';
 import { coreAgent } from '@agents';
 import testing from './routes/testing';
