@@ -97,7 +97,7 @@ export const DATA_GOV_FINAL_EVALUATION_PROMPT = ChatPromptTemplate.fromMessages(
 
       ### Output Format
       - **Summary**: A clear, concise summary of the resulting data. Include exact numbers and percentages where applicable. Structure it as an answer to the user's question.
-      - **Table**: The resulting table of data. Leave this in as raw a format as possible.
+      - **Table**: The resulting table of data. Leave this in as raw a format as possible. Do not wrap in backticks, but leave in Github-style markdown table formatting.
       - **Queries**: The SQL queries that were executed.
       - **Dataset**: The dataset that was used to answer the question, including the ID, title, and download link. THE DOWNLOAD LINK MUST BE EXACTLY THE SAME AS THE ONE IN THE FINAL DATASET.
       - **Useful links**: Any and all useful links you see in the full package metadata, along with a brief title-style description for them.
