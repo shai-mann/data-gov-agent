@@ -7,7 +7,7 @@ import {
   StateGraph,
 } from '@langchain/langgraph';
 import { ToolNode } from '@langchain/langgraph/prebuilt';
-import { packageSearch, packageNameSearch, packageShow } from '@tools';
+import { packageSearch, packageShow } from '@tools';
 import { openai } from '@llms';
 import {
   DATA_GOV_SEARCH_PROMPT,
@@ -33,6 +33,10 @@ const DatasetSearchAnnotation = Annotation.Root({
     reducer: (cur, val) => cur.concat(val),
     default: () => [],
   }),
+  pastQueries: Annotation<string[]>({
+    reducer: (cur, val) => cur.concat(val),
+    default: () => [],
+  }),
   pendingDatasets: Annotation<string[]>(),
   userQuery: Annotation<string>(),
   selectedDataset: Annotation<DatasetWithEvaluation | null>(),
@@ -50,7 +54,7 @@ const EvalDatasetAnnotation = Annotation.Root({
 
 /* MODELS */
 
-const tools = [packageSearch, packageNameSearch];
+const tools = [packageSearch];
 
 const model = openai.bindTools(tools);
 
@@ -67,31 +71,17 @@ const structuredModel = openai.withStructuredOutput(
 /* NODES */
 
 /**
- * Node to setup the dataset searching agent.
- */
-async function setupNode(state: typeof DatasetSearchAnnotation.State) {
-  const { userQuery } = state;
-
-  if (!userQuery) {
-    throw new Error('Must provide a user query');
-  }
-
-  const prompt = await DATA_GOV_SEARCH_PROMPT.formatMessages({
-    query: userQuery,
-  });
-
-  return {
-    messages: prompt,
-  };
-}
-
-/**
  * Node to call the model to search for datasets.
  */
 async function modelNode(state: typeof DatasetSearchAnnotation.State) {
-  const { messages } = state;
+  const { pastQueries, userQuery } = state;
 
-  const result = await model.invoke(messages);
+  const prompt = await DATA_GOV_SEARCH_PROMPT.formatMessages({
+    query: userQuery,
+    pastQueries: pastQueries.length > 0 ? pastQueries.join('\n') : 'None',
+  });
+
+  const result = await model.invoke(prompt);
 
   return {
     messages: result,
@@ -137,15 +127,15 @@ async function postToolsNode(state: typeof DatasetSearchAnnotation.State) {
 async function shallowEvalNode(state: typeof EvalDatasetAnnotation.State) {
   const { datasetId, userQuery, connectionId } = state;
 
-  logSubState(
-    connectionId,
-    'DatasetSearch',
-    `Evaluating dataset: ${datasetId}`
-  );
-
   const dataset = await packageShow.invoke({
     packageId: datasetId,
   });
+
+  logSubState(
+    connectionId,
+    'DatasetSearch',
+    `Evaluating dataset: ${dataset.name}`
+  );
 
   const { summary, evaluations } = await shallowEvalAgent.invoke({
     dataset,
@@ -158,7 +148,7 @@ async function shallowEvalNode(state: typeof EvalDatasetAnnotation.State) {
     logSubState(
       connectionId,
       'DatasetSearch',
-      `Dataset ${datasetId} not compatible`
+      `Dataset ${dataset.name} not compatible`
     );
     return {};
   }
@@ -172,7 +162,7 @@ async function shallowEvalNode(state: typeof EvalDatasetAnnotation.State) {
   logSubState(
     connectionId,
     'DatasetSearch',
-    `Dataset ${datasetId} evaluation complete`,
+    `Dataset ${dataset.name} evaluation complete`,
     {
       bestResource: datasetSelection.bestResource,
     }
@@ -250,7 +240,7 @@ function shouldContinueToTools(state: typeof DatasetSearchAnnotation.State) {
     return 'tools';
   }
 
-  return END;
+  return 'model';
 }
 
 /**
@@ -286,7 +276,6 @@ function shouldContinueToModel(state: typeof DatasetSearchAnnotation.State) {
 }
 
 const graph = new StateGraph(DatasetSearchAnnotation)
-  .addNode('setup', setupNode)
   .addNode('model', modelNode)
   .addNode('tools', new ToolNode(tools))
   .addNode('postTools', postToolsNode)
@@ -294,9 +283,8 @@ const graph = new StateGraph(DatasetSearchAnnotation)
   // Defer the try select node, so the shallow eval nodes are forced to fan-in before it runs.
   .addNode('trySelect', trySelectNode, { defer: true })
 
-  .addEdge(START, 'setup')
-  .addEdge('setup', 'model')
-  .addConditionalEdges('model', shouldContinueToTools, ['tools', END])
+  .addEdge(START, 'model')
+  .addConditionalEdges('model', shouldContinueToTools, ['tools', 'model'])
   .addEdge('tools', 'postTools')
   .addConditionalEdges('postTools', shouldContinueToEval, [
     'shallowEval',

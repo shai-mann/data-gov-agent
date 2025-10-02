@@ -7,15 +7,13 @@ import { PackageShowSchema } from '@lib/data-gov.schemas';
  * Search for packages (datasets) on data.gov using the CKAN API
  */
 export const packageSearch = tool(
-  async ({ query, limit = 10, offset = 0 }) => {
-    console.log(
-      `🔍 Package Search - Query: "${query}", Limit: ${limit}, Offset: ${offset}`
-    );
+  async ({ query }) => {
+    console.log(`🔍 Package Search - Query: "${query}"`);
 
     // Search for packages on data.gov, applying pagination post-fact (since the API doesn't support pagination)
     const { result } = await searchPackages(query);
 
-    const packages = result.results.slice(offset, offset + limit);
+    const packages = result.results.slice(0, 10);
 
     // Extract only necessary keys from the package object
     const massagedPackages = packages
@@ -38,7 +36,7 @@ export const packageSearch = tool(
 
     return {
       success: true,
-      results: massagedPackages.slice(offset, offset + limit),
+      results: massagedPackages,
     };
   },
   {
@@ -47,16 +45,6 @@ export const packageSearch = tool(
       'Search for datasets on data.gov using keywords. Returns a list of matching packages with metadata.',
     schema: z.object({
       query: z.string().describe('Search query for finding datasets'),
-      limit: z
-        .number()
-        .optional()
-        .default(10)
-        .describe('Maximum number of results to return (default: 10)'),
-      offset: z
-        .number()
-        .optional()
-        .default(0)
-        .describe('Number of results to skip for pagination (default: 0)'),
     }),
   }
 );
