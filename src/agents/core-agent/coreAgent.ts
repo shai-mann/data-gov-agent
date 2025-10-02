@@ -17,14 +17,6 @@ import {
 import { DatasetWithEvaluation } from '@agents/search-agent/searchAgent';
 import { logStateTransition, logSubState } from '@lib/ws-logger';
 
-/*
-// TODO: Follow up on this comment - do I still need it?
-NOTE: This **was** a core agent (running exactly as you see below), but due to token limitations (20k tokens/min for my account),
-I'm submitting the separate agents for search, eval, and query, rather than this full combined agent.
-
-This code still exists so you can see how it would all get stitched together, but the project itself lives in the other agent files.
-*/
-
 /* ANNOTATIONS */
 
 /**
@@ -103,7 +95,9 @@ async function queryNode(state: typeof GovResearcherAnnotation.State) {
       connectionId,
     },
     {
-      recursionLimit: 30, // Query agent often needs some extra iterations
+      // Query agent often needs some extra iterations
+      // It also has it's own internal recursion limit, which doesn't error out, but returns a message indicating that it couldn't complete.
+      recursionLimit: 50,
     }
   );
 

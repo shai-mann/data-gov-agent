@@ -36,32 +36,28 @@ export function unregisterWSConnection(connectionId: string) {
 }
 
 /**
- * Send a message to a specific WebSocket connection
- * If connectionId is undefined, logs a warning about the swallowed message
+ * Send a message to a specific WebSocket connection (async, non-blocking)
+ * If connectionId is undefined, silently skips sending
  */
 export function sendToConnection(
   connectionId: string | undefined,
   message: WSMessage
 ) {
-  if (!connectionId) {
-    console.warn(
-      '[WS] Message not sent - no connection ID provided:',
-      message.type
-    );
-    return;
-  }
+  // Make this async to avoid blocking the agent's execution
+  setImmediate(() => {
+    if (!connectionId || !wsConnections.has(connectionId)) {
+      return; // Silently skip - no need to log
+    }
 
-  if (!wsConnections.has(connectionId)) {
-    console.warn(
-      `[WS] Message not sent - connection ${connectionId} not found:`,
-      message.type
-    );
-    return;
-  }
-
-  const ws = wsConnections.get(connectionId);
-  console.log('Sending message to connection:', connectionId, message);
-  ws?.send(JSON.stringify(message));
+    const ws = wsConnections.get(connectionId);
+    if (ws) {
+      try {
+        ws.send(JSON.stringify(message));
+      } catch (error) {
+        console.error(`[WS] Error sending to ${connectionId}:`, error);
+      }
+    }
+  });
 }
 
 /**
@@ -73,7 +69,7 @@ export function logStateTransition(
   toState: string,
   metadata?: any
 ) {
-  console.log(`[State] ${fromState} → ${toState}`);
+  setImmediate(() => console.log(`[State] ${fromState} → ${toState}`));
   sendToConnection(connectionId, {
     type: WSMessageType.STATE_TRANSITION,
     timestamp: new Date().toISOString(),
@@ -94,7 +90,7 @@ export function logSubState(
   action: string,
   metadata?: any
 ) {
-  console.log(`  [${state}] ${action}`);
+  setImmediate(() => console.log(`  [${state}] ${action}`));
   sendToConnection(connectionId, {
     type: WSMessageType.SUB_STATE_LOG,
     timestamp: new Date().toISOString(),
@@ -114,7 +110,7 @@ export function logInfo(
   message: string,
   metadata?: any
 ) {
-  console.log(`[Info] ${message}`);
+  setImmediate(() => console.log(`[Info] ${message}`));
   sendToConnection(connectionId, {
     type: WSMessageType.INFO,
     timestamp: new Date().toISOString(),
@@ -133,7 +129,7 @@ export function logError(
   error: string | Error,
   context?: any
 ) {
-  console.error(`[Error]`, error);
+  setImmediate(() => console.error(`[Error]`, error));
   sendToConnection(connectionId, {
     type: WSMessageType.ERROR,
     timestamp: new Date().toISOString(),
