@@ -92,8 +92,10 @@ async function setupNode(state: typeof DatasetEvalAnnotation.State) {
 
   // Extract any VALID extra links
   const extras = dataset.extras
+    // Filter out non-string values
+    .filter(extra => typeof extra.value === 'string')
     // Filter to links
-    .filter(extra => extra.value.includes('http'))
+    .filter(extra => (extra.value as string).includes('http'))
     // Map to pending resources format
     .map(extra => ({
       url: extra.value,

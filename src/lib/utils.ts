@@ -3,7 +3,6 @@ import {
   isAIMessage,
   isToolMessage,
 } from '@langchain/core/messages';
-import { z } from 'zod';
 
 export const ONE_SECOND = 1000;
 
@@ -33,18 +32,3 @@ export function getToolMessages(
       .map(m => JSON.parse(m.content as string))
   );
 }
-
-/**
- * My own little helper schema to coerce a boolean to a string, if the type is usually a string!
- */
-export const BoolOrStringSchema = z
-  .union([z.string(), z.boolean(), z.array(z.string())])
-  .transform(val => {
-    if (typeof val === 'boolean') {
-      return val ? 'true' : 'false';
-    }
-    if (Array.isArray(val)) {
-      return val.join(', ');
-    }
-    return val;
-  });

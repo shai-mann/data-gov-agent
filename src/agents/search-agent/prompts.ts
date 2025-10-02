@@ -12,22 +12,26 @@ The user wants datasets that can answer their question: "{query}".
 
 Your task is to find a dataset that can answer the user's question. You have access to:
 
-- packageSearch: Search for datasets by keywords (includes metadata). Use more targeted keywords here, focusing on the user’s query and any promising dataset names you found in the previous step.
+- packageSearch: Search for datasets by keywords (includes metadata). See information in the following system message for how to format your queries.
 
 Follow this workflow carefully:
 
-1. Start by thinking of good government-specific keywords and search patterns to use when searching for datasets.
-  - Make careful note of past queries, and avoid repeating them, as they found no relevant datasets.
-  - Rely heavily on the following message, which contains information about query formatting and how it is interpreted.
-  - Attempt to come up with 5-7 good queries to try, each using different keywords and search patterns.
+1. Start by thinking of good government-specific keywords, and potential government agencies that may maintain relevant datasets.
   - Good keywords are NOT just parts of the user's query. These are government datasets, so using government-specific keywords is more likely to find relevant datasets.
+  - Don't use full agency names as the maintainer, just come up with a word or phrase that is likely to be in the agency's name, and put wildcards on either side.
+2. Construct 5-7 queries using the keywords and agencies you found. Some should include a maintainer, using the * wildcard to include a range of agencies, others should not.
+  - Make careful note of past queries, and avoid repeating them, as they found no relevant datasets.
+  - Rely heavily on the following system message for formatting guidelines, as it contains information about query formatting and how it will be interpreted.
+  - All queries MUST have at least one keyword, and no more than two. Maintainers are optional, but should be included in at least one query, maximum three.
 2. **Send a batch of packageSearch calls** with the queries you came up with.
   - Try and vary the government-specific keywords used, so you can hit a wider range of datasets.
+  - For some of the queries, try including a maintainer, using the * wildcard to include a range of agencies.
 
 Guidelines for query construction:
 - Avoid searching for a specific rather than a general term. For example, if the user is asking about a specific age range, look for data segmented by age, rather than data just for that age group.
-- Using the special characters like '+' is good for indicating that a keyword is important. See more details below.
+- Examine the simple and advanced search examples below for inspiration on formatting your queries.
 - Restrict to 1-2 keywords maximum per query.
+- In addition to the keywords, it is often useful to specify a maintainer, using the * wildcard to include a range of agencies.
 
 QUERIES YOU HAVE ALREADY TRIED (all of these returned no relevant datasets):
 {pastQueries}
@@ -62,6 +66,8 @@ title:european this will look for all the datasets containing in its title the w
 title:europ* this will look for all the datasets containing in its title a word that starts with “europ” like “europe” and “european”.
 
 title:europe || title:africa will look for datasets containing “europe” or “africa” in its title.
+
+maintainer:*census* will search for all datasets maintained by an agency with the word “census” in its name.
 `,
   },
 ]);

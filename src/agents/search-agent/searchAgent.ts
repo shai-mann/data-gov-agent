@@ -19,6 +19,7 @@ import { DatasetSummary } from '../eval-agent/annotations';
 import { ResourceEvaluation } from '../resource-eval-agent/annotations';
 import { logSubState } from '@lib/ws-logger';
 import evalAgent from '@agents/eval-agent/evalAgent';
+import { AIMessage } from 'langchain';
 
 // TODO: replace the type in lib/annotations with this one, and move ancillary types there as well.
 export type DatasetWithEvaluation = DatasetSummary & {
@@ -112,13 +113,22 @@ async function postToolsNode(state: typeof DatasetSearchAnnotation.State) {
     // Filter out the datasets that have already been selected.
     .filter(id => !datasets.some(d => d.id === id));
 
+  const packageSearches = (
+    messages.at(lastAiMessageIndex) as AIMessage
+  )?.tool_calls
+    ?.filter(t => t.name === 'package_search')
+    .map(t => t.args.query);
+
   logSubState(
     connectionId,
     'DatasetSearch',
     `Found ${packageSearchDatasetIds.length} new datasets to evaluate`
   );
 
-  return { pendingDatasets: packageSearchDatasetIds };
+  return {
+    pendingDatasets: packageSearchDatasetIds,
+    pastQueries: packageSearches,
+  };
 }
 
 /**
@@ -143,12 +153,12 @@ async function evalNode(state: typeof EvalDatasetAnnotation.State) {
     connectionId,
   });
 
-  // If the dataset is not compatible, don't add it to the state.
+  // If the dataset is not compatible or not relevant, don't add it to the state.
   if (!summary) {
     logSubState(
       connectionId,
       'DatasetSearch',
-      `Dataset ${dataset.name} not compatible`
+      `Dataset ${dataset.name} not compatible or irrelevant`
     );
     return {};
   }
