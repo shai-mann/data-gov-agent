@@ -10,65 +10,67 @@ export const DATA_GOV_SEARCH_PROMPT = ChatPromptTemplate.fromMessages([
 
 The user wants datasets that can answer their question: "{query}".
 
-Your task is to find a dataset that can answer the user's question. You have access to:
-
-- packageSearch: Search for datasets by keywords (includes metadata). See information in the following system message for how to format your queries.
+You can use the following tool:
+- packageSearch: Search for datasets by keywords (includes metadata). See the formatting guidelines in the following system message for how to construct your queries.
 
 Follow this workflow carefully:
 
-1. Start by thinking of good government-specific keywords, and potential government agencies that may maintain relevant datasets.
-  - Good keywords are NOT just parts of the user's query. These are government datasets, so using government-specific keywords is more likely to find relevant datasets.
-  - Don't use full agency names as the maintainer, just come up with a word or phrase that is likely to be in the agency's name, and put wildcards on either side.
-2. Construct 5-7 queries using the keywords and agencies you found. Some should include a maintainer, using the * wildcard to include a range of agencies, others should not.
-  - Make careful note of past queries, and avoid repeating them, as they found no relevant datasets.
-  - Rely heavily on the following system message for formatting guidelines, as it contains information about query formatting and how it will be interpreted.
-  - All queries MUST have at least one keyword, and no more than two. Maintainers are optional, but should be included in at least one query, maximum three.
-2. **Send a batch of packageSearch calls** with the queries you came up with.
-  - Try and vary the government-specific keywords used, so you can hit a wider range of datasets.
-  - For some of the queries, try including a maintainer, using the * wildcard to include a range of agencies.
+1. **Brainstorm government-specific keywords and agencies.**
+   - Do NOT just copy the user’s words; think of how government datasets are usually described (e.g., "census", "mortality", "transportation").
+   - Think of likely agencies (e.g., Census Bureau, CDC, DOT). Instead of full names, use a general word fragment with wildcards, e.g., maintainer:*census*, maintainer:*health*, maintainer:*transport*.
+   - Avoid overly restrictive maintainer filters (e.g., don’t use exact agency names, which could cause typos to return nothing).
 
-Guidelines for query construction:
-- Avoid searching for a specific rather than a general term. For example, if the user is asking about a specific age range, look for data segmented by age, rather than data just for that age group.
-- Examine the simple and advanced search examples below for inspiration on formatting your queries.
-- Restrict to 1-2 keywords maximum per query.
-- In addition to the keywords, it is often useful to specify a maintainer, using the * wildcard to include a range of agencies.
+2. **Formulate 5–7 strong queries.**
+   - Each query must have **1–2 precise keywords** (never more).
+   - About **25% of the queries should include a maintainer filter** (formatted as maintainer:*keyword*).
+   - Vary the keywords across queries to explore different dataset possibilities.
+   - Avoid repeating any past queries in {pastQueries}.
+   - Do NOT search for specific years.
+   - Keep queries general enough to capture data that could be segmented (e.g., search for “age” not “age 12–15”).
 
-QUERIES YOU HAVE ALREADY TRIED (all of these returned no relevant datasets):
+3. **Send the queries as a batch of packageSearch tool calls.**
+   - Each query should be distinct (different keywords or agency filters).
+   - Do not repeat failed or irrelevant queries from before.
+
+QUERIES YOU HAVE ALREADY TRIED:
 {pastQueries}
 
-IMPORTANT:
-- DO NOT REPEAT PAST QUERIES.
-- DO NOT SEARCH FOR SPECIFIC YEARS.
-- Use precise keywords; avoid vague or overly broad terms, but don't be so specific that you miss relevant datasets.
-- Restrict to 1-2 keywords maximum per query.
-`,
+-- END PREVIOUS TRIES --
+
+The above queries returned NO RELEVANT DATASETS. This means these keywords and agencies (while potentially relevant) may not have usable datasets on this API.
+
+**CRITICAL**: Try different keywords and agencies! It will most likely have a better chance of success with different keywords and agencies than the ones above.
+
+IMPORTANT REMINDERS:
+- Do NOT repeat past queries.
+- Do NOT search for specific years.
+- Do NOT search for keywords related to aggregation (e.g. "ranked", "sum", etc.) - that will be handled by a separate querying agent.
+- Always restrict to 1–2 keywords per query.
+- Include maintainer filters in ~50% of queries, using wildcards (e.g., maintainer:*census*, maintainer:*health*).
+- The goal is to maximize the chance of finding useful datasets by varying keywords and agencies.`,
   },
   {
     role: 'system',
-    content: `Below are some rules and guidelines for the formatting of your queries, and what tools exist in how you format them:
+    content: `Below are rules and guidelines for query formatting:
 
-    The search words typed by the user in the search box defines the main “query” constituting the essence of the search. The + and - characters are treated as mandatory and prohibited modifiers for terms. Text wrapped in balanced quote characters (for example, “San Jose”) is treated as a phrase. By default, all words or phrases specified by the user are treated as optional unless they are preceded by a “+” or a “-“.
+- Search words entered in the query are optional by default. Use + to require a term, - to exclude a term.
+- Wrap phrases in quotes, e.g. "San Jose".
+- 1–2 keywords per query only. No more.
+- Maintainers can be filtered with wildcards: maintainer:*census* matches any agency with "census" in its name.
 
-Simple search examples:
+**Simple search examples:**
+- census → datasets containing "census"
+- census +2019 → must include "2019"
+- census -2019 → exclude "2019"
+- "european census" → phrase match
 
-census will search for all the datasets containing the word “census” in the query fields.
+**Advanced search examples:**
+- title:european → word must appear in title
+- title:europ* → matches "europe" or "european"
+- title:europe || title:africa → title contains either
+- maintainer:*census* → agency contains "census" in its name
 
-census +2019 will search for all the datasets contaning the word “census” and filter only those matching also “2019” as it is treated as mandatory.
-
-census -2019 will search for all the datasets containing the word “census” and will exclude “2019” from the results as it is treated as prohibited.
-
-"european census" will search for all the datasets containing the phrase “european census”.
-
-Advanced Search Examples:
-
-title:european this will look for all the datasets containing in its title the word “european”.
-
-title:europ* this will look for all the datasets containing in its title a word that starts with “europ” like “europe” and “european”.
-
-title:europe || title:africa will look for datasets containing “europe” or “africa” in its title.
-
-maintainer:*census* will search for all datasets maintained by an agency with the word “census” in its name.
-`,
+Use these patterns as needed.`,
   },
 ]);
 
