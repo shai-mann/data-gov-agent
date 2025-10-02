@@ -133,8 +133,6 @@ async function emitFinalEvaluationNode(
 
   const response = await openai.invoke(prompt);
 
-  logSubState(connectionId, 'FinalEvaluation', 'Response complete');
-
   return {
     output: response.content,
   };
