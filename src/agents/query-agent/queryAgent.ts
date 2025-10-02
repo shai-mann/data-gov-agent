@@ -27,7 +27,7 @@ import { sqlQueryTool } from '@tools';
 import { DatasetWithEvaluation } from '@agents/search-agent/searchAgent';
 import { logSubState } from '@lib/ws-logger';
 
-const MAX_QUERY_COUNT = 5;
+const MAX_QUERY_COUNT = 10;
 
 /* ANNOTATIONS */
 
@@ -219,7 +219,7 @@ async function evaluateQueryNode(state: typeof DatasetEvalAnnotation.State) {
  * Formulate a structured output including summary, table, and queries.
  */
 async function outputNode(state: typeof DatasetEvalAnnotation.State) {
-  const { messages, userQuery } = state;
+  const { messages, userQuery, tableName } = state;
   const lastMessage = messages.at(-1) as AIMessage;
 
   const prompt = await QUERY_AGENT_SQL_QUERY_OUTPUT_PROMPT.formatMessages({
@@ -229,6 +229,9 @@ async function outputNode(state: typeof DatasetEvalAnnotation.State) {
 
   const summary = await structuredModel.invoke(prompt);
 
+  // Drop the database table, so conflicting tables can't be created.
+  await conn.run(`DROP TABLE ${tableName}`);
+
   return {
     summary,
   };
@@ -237,10 +240,11 @@ async function outputNode(state: typeof DatasetEvalAnnotation.State) {
 /* EDGES */
 
 function shouldContinue(state: typeof DatasetEvalAnnotation.State) {
-  const messages = state.messages;
+  const { messages, queryCount } = state;
   const lastMessage = messages.at(-1) as AIMessage;
 
   if (
+    queryCount < MAX_QUERY_COUNT &&
     'tool_calls' in lastMessage &&
     Array.isArray(lastMessage.tool_calls) &&
     lastMessage.tool_calls?.length

@@ -100,10 +100,11 @@ async function setupNode(state: typeof DatasetEvalAnnotation.State) {
 }
 
 async function evalNode(state: typeof ResourceEvaluationAnnotation.State) {
-  const { resource, userQuery } = state;
+  const { resource, userQuery, datasetName } = state;
 
   // Call the per-resource eval-agent
   const { evaluation } = await resourceEvalAgent.invoke({
+    datasetName,
     resource,
     userQuery,
   });
@@ -141,13 +142,16 @@ async function summativeEvaluationNode(
 /* EDGES */
 
 async function fanOutEdge(state: typeof DatasetEvalAnnotation.State) {
-  const { pendingResources: resources, userQuery } = state;
+  const { pendingResources: resources, userQuery, dataset } = state;
 
   if (resources.length === 0) {
     return END;
   }
 
-  return resources.map(resource => new Send('eval', { resource, userQuery }));
+  return resources.map(
+    resource =>
+      new Send('eval', { resource, userQuery, datasetName: dataset.name })
+  );
 }
 
 const graph = new StateGraph(DatasetEvalAnnotation)

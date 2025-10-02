@@ -122,7 +122,11 @@ async function postToolsNode(state: typeof DatasetSearchAnnotation.State) {
     // Filter out the datasets that have already been selected.
     .filter(id => !datasets.some(d => d.id === id));
 
-  logSubState(connectionId, 'DatasetSearch', `Found ${packageSearchDatasetIds.length} new datasets to evaluate`);
+  logSubState(
+    connectionId,
+    'DatasetSearch',
+    `Found ${packageSearchDatasetIds.length} new datasets to evaluate`
+  );
 
   return { pendingDatasets: packageSearchDatasetIds };
 }
@@ -133,7 +137,11 @@ async function postToolsNode(state: typeof DatasetSearchAnnotation.State) {
 async function shallowEvalNode(state: typeof EvalDatasetAnnotation.State) {
   const { datasetId, userQuery, connectionId } = state;
 
-  logSubState(connectionId, 'DatasetSearch', `Evaluating dataset: ${datasetId}`);
+  logSubState(
+    connectionId,
+    'DatasetSearch',
+    `Evaluating dataset: ${datasetId}`
+  );
 
   const dataset = await packageShow.invoke({
     packageId: datasetId,
@@ -147,7 +155,11 @@ async function shallowEvalNode(state: typeof EvalDatasetAnnotation.State) {
 
   // If the dataset is not compatible, don't add it to the state.
   if (!summary) {
-    logSubState(connectionId, 'DatasetSearch', `Dataset ${datasetId} not compatible`);
+    logSubState(
+      connectionId,
+      'DatasetSearch',
+      `Dataset ${datasetId} not compatible`
+    );
     return {};
   }
 
@@ -157,9 +169,14 @@ async function shallowEvalNode(state: typeof EvalDatasetAnnotation.State) {
     evaluations,
   };
 
-  logSubState(connectionId, 'DatasetSearch', `Dataset ${datasetId} evaluation complete`, {
-    bestResource: datasetSelection.bestResource,
-  });
+  logSubState(
+    connectionId,
+    'DatasetSearch',
+    `Dataset ${datasetId} evaluation complete`,
+    {
+      bestResource: datasetSelection.bestResource,
+    }
+  );
 
   // Uses state key for outer state, so it will automatically roll up there.
   // Also needs the reducer for that state to use concatenation.
@@ -180,7 +197,11 @@ async function trySelectNode(state: typeof DatasetSearchAnnotation.State) {
     };
   }
 
-  logSubState(connectionId, 'DatasetSearch', `Selecting best dataset from ${newDatasets.length} candidates`);
+  logSubState(
+    connectionId,
+    'DatasetSearch',
+    `Selecting best dataset from ${newDatasets.length} candidates`
+  );
 
   const selectionPrompt = await DATA_GOV_SEARCH_SELECTION_PROMPT.formatMessages(
     {
@@ -191,10 +212,16 @@ async function trySelectNode(state: typeof DatasetSearchAnnotation.State) {
 
   const result = await structuredModel.invoke(selectionPrompt);
 
-  const selectedDataset = result.id ? datasets.find(d => d.id === result.id) : null;
+  const selectedDataset = result.id
+    ? datasets.find(d => d.id === result.id)
+    : null;
 
   if (selectedDataset) {
-    logSubState(connectionId, 'DatasetSearch', `Selected dataset: ${selectedDataset.id}`);
+    logSubState(
+      connectionId,
+      'DatasetSearch',
+      `Selected dataset: ${selectedDataset.id}`
+    );
   }
 
   return {
@@ -238,7 +265,13 @@ function shouldContinueToEval(state: typeof DatasetSearchAnnotation.State) {
   }
 
   return pendingDatasets.map(
-    id => new Send('shallowEval', { datasetId: id, userQuery, datasets, connectionId })
+    id =>
+      new Send('shallowEval', {
+        datasetId: id,
+        userQuery,
+        datasets,
+        connectionId,
+      })
   );
 }
 
