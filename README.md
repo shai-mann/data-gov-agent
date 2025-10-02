@@ -102,39 +102,69 @@ curl -X POST http://localhost:3000/v1/data-gov/search \
 
 ## Project Structure
 
+> **Note on Import Paths**: This project uses relative imports (e.g., `../../lib/utils.ts`) rather than aliased imports (e.g., `@/lib/utils`). While aliased imports would improve readability, they are not easily configurable for serverless deployment environments without additional build complexity. I apologize for any inconvenience this may cause when navigating the codebase.
+
 ```
 ├── src/
-│   ├── agents/
-│   │   ├── calcAgent.ts          # Simple arithmetic calculator agent
-│   │   ├── dataGovAgent.ts       # Data.gov dataset search agent
-│   │   ├── calcAgent.test.ts     # Calculator agent tests
-│   │   ├── dataGovAgent.test.ts  # Data.gov agent tests
-│   │   └── helpers/
-│   │       └── exportGraphPNG.ts # Graph visualization helper
-│   ├── llms/
-│   │   ├── index.ts              # LLM exports
-│   │   └── openai.ts             # OpenAI configuration
-│   ├── tools/
-│   │   ├── add.ts                # Simple addition tool
-│   │   ├── packageSearch.ts      # Data.gov package search tool
-│   │   ├── packageShow.ts        # Data.gov package details tool
-│   │   ├── doiView.ts            # DOI information tool
-│   │   ├── datasetDownload.ts    # Dataset download and preview tool
-│   │   ├── datasetEvaluation.ts  # Dataset suitability evaluation tool
-│   │   └── index.ts              # Tool exports
-│   └── index.ts                  # Main server file
-├── test/
-│   ├── __fixtures__/             # Test fixtures and mocks
-│   ├── extendExpect.ts           # Test extensions
-│   ├── nockSetup.ts              # HTTP mocking setup
-│   └── redactInvocationIds.ts    # Test data redaction
+│   ├── agents/                           # LangGraph agent implementations
+│   │   ├── core-agent/                   # Main orchestration agent
+│   │   │   ├── coreAgent.ts             # Coordinates query, search, and eval agents
+│   │   │   └── prompts.ts               # System prompts for core agent
+│   │   ├── query-agent/                  # Query analysis and SQL generation
+│   │   │   ├── queryAgent.ts            # Analyzes queries and generates SQL
+│   │   │   └── prompts.ts               # Query agent prompts
+│   │   ├── search-agent/                 # Dataset discovery and evaluation
+│   │   │   ├── searchAgent.ts           # Searches and evaluates datasets
+│   │   │   └── prompts.ts               # Search agent prompts
+│   │   ├── eval-agent/                   # Dataset quality evaluation
+│   │   │   ├── evalAgent.ts             # Evaluates dataset suitability
+│   │   │   ├── prompts.ts               # Evaluation prompts
+│   │   │   └── annotations.ts           # Type definitions for eval state
+│   │   ├── resource-eval-agent/          # Resource-specific evaluation
+│   │   │   ├── resourceEvalAgent.ts     # Evaluates individual resources
+│   │   │   ├── prompts.ts               # Resource eval prompts
+│   │   │   └── annotations.ts           # Type definitions for resource state
+│   │   └── index.ts                      # Agent exports
+│   ├── tools/                            # LangChain tools for Data.gov API
+│   │   ├── packageSearch.ts              # Search datasets by keywords
+│   │   ├── packageNameSearch.ts          # Search datasets by exact name
+│   │   ├── packageShow.ts                # Get detailed dataset metadata
+│   │   ├── doiView.ts                    # Retrieve DOI information
+│   │   ├── sqlQuery.ts                   # Execute SQL queries on datasets
+│   │   ├── datasetDownload.ts            # Download and preview datasets
+│   │   └── index.ts                      # Tool exports
+│   ├── lib/                              # Shared utilities and data access
+│   │   ├── data-gov.ts                   # Data.gov API client functions
+│   │   ├── data-gov.schemas.ts           # Zod schemas for API responses
+│   │   ├── database.ts                   # Database utilities (if applicable)
+│   │   ├── annotation.ts                 # Shared LangGraph annotations
+│   │   ├── utils.ts                      # General utility functions
+│   │   └── mock-data.ts                  # Mock data for testing
+│   ├── llms/                             # LLM configuration
+│   │   ├── openai.ts                     # OpenAI model initialization
+│   │   └── index.ts                      # LLM exports
+│   ├── routes/                           # HTTP route handlers
+│   │   ├── agents.ts                     # Agent-related endpoints
+│   │   └── testing.ts                    # Testing/development endpoints
+│   └── index.ts                          # Main Hono server and routes
 ├── .github/workflows/
-│   └── ci.yml                    # GitHub Actions CI workflow
-├── tsconfig.json                 # TypeScript configuration
-├── vitest.config.ts              # Vitest test configuration
-├── package.json                  # Dependencies and scripts
-└── README.md                    # This file
+│   └── ci.yml                            # GitHub Actions CI workflow
+├── tsconfig.json                         # TypeScript configuration
+├── package.json                          # Dependencies and scripts
+└── README.md                            # This file
 ```
+
+### Architecture Overview
+
+The application follows a multi-agent architecture using LangGraph:
+
+- **Core Agent**: Orchestrates the entire workflow, coordinating between query analysis, dataset search, and evaluation
+- **Query Agent**: Analyzes user queries to understand data requirements and generates SQL for dataset analysis
+- **Search Agent**: Discovers relevant datasets using the Data.gov API and performs initial filtering
+- **Eval Agent**: Evaluates datasets for suitability based on metadata, quality, and relevance
+- **Resource Eval Agent**: Performs detailed evaluation of individual dataset resources (files, APIs, etc.)
+
+Each agent is implemented as a LangGraph state machine with clearly defined nodes and edges, allowing for complex reasoning workflows while maintaining modularity and testability.
 
 ## CI/CD
 
