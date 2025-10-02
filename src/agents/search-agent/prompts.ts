@@ -39,7 +39,7 @@ QUERIES YOU HAVE ALREADY TRIED:
 
 The above queries returned NO RELEVANT DATASETS. This means these keywords and agencies (while potentially relevant) may not have usable datasets on this API.
 
-**CRITICAL**: Try different keywords and agencies! It will most likely have a better chance of success with different keywords and agencies than the ones above.
+**CRITICAL**: If you have already tried queries, try mutations of the keywords and agencies from the ones you have already tried, mixed with new ones! It will most likely have a better chance of success.
 
 IMPORTANT REMINDERS:
 - Do NOT repeat past queries.

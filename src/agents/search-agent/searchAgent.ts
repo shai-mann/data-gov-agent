@@ -21,6 +21,8 @@ import { logSubState } from '@lib/ws-logger';
 import evalAgent from '@agents/eval-agent/evalAgent';
 import { AIMessage } from 'langchain';
 
+const MAX_QUERY_COUNT = 15; // To prevent infinite loops, we let it try 15 different queries before giving up.
+
 // TODO: replace the type in lib/annotations with this one, and move ancillary types there as well.
 export type DatasetWithEvaluation = DatasetSummary & {
   id: string;
@@ -280,9 +282,9 @@ function shouldContinueToEval(state: typeof DatasetSearchAnnotation.State) {
 }
 
 function shouldContinueToModel(state: typeof DatasetSearchAnnotation.State) {
-  const { selectedDataset } = state;
+  const { selectedDataset, pastQueries } = state;
 
-  if (selectedDataset) {
+  if (selectedDataset || pastQueries.length >= MAX_QUERY_COUNT) {
     return END;
   }
 
