@@ -13,6 +13,7 @@ import { getPackage } from '@lib/data-gov';
 import {
   DATA_GOV_FINAL_EVALUATION_PROMPT,
   DATA_GOV_USER_QUERY_FORMATTING_PROMPT,
+  NO_DATASET_FOUND_MESSAGE,
 } from './prompts';
 import { DatasetWithEvaluation } from '@agents/search-agent/searchAgent';
 import { logStateTransition, logSubState } from '@lib/ws-logger';
@@ -122,7 +123,7 @@ async function emitFinalEvaluationNode(
   if (!dataset) {
     // Emit a formatted message indicating that no dataset was selected.
     return {
-      output: `We couldn't find a dataset that could answer your question. Try adjusting the question or scope slightly, although we may be struggling due to lack of datasets available.`,
+      output: NO_DATASET_FOUND_MESSAGE,
     };
   }
 
@@ -157,7 +158,7 @@ async function shouldContinueToQuery(
     return 'query';
   }
 
-  return END;
+  return 'emitOutput';
 }
 
 // Build the gov researcher agent workflow
@@ -169,7 +170,7 @@ const graph = new StateGraph(GovResearcherAnnotation)
 
   .addEdge(START, 'format')
   .addEdge('format', 'search')
-  .addConditionalEdges('search', shouldContinueToQuery, ['query', END])
+  .addConditionalEdges('search', shouldContinueToQuery, ['query', 'emitOutput'])
   .addEdge('query', 'emitOutput')
   .addEdge('emitOutput', END)
 

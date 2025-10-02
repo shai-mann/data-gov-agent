@@ -105,3 +105,22 @@ export const DATA_GOV_FINAL_EVALUATION_PROMPT = ChatPromptTemplate.fromMessages(
     },
   ]
 );
+
+/**
+ * Not really a prompt, but nicer to have here.
+ */
+export const NO_DATASET_FOUND_MESSAGE = `⚠️ **No Matching Dataset Found**
+
+We couldn’t find a dataset that directly answers your question.
+This might be because:
+
+- The scope of your question is too narrow or too broad.
+- Relevant datasets may not be available in the current catalog.
+- The data could exist under different terminology or categories.
+
+### Suggestions
+- Try rephrasing your question with simpler or broader keywords.
+- Experiment with related terms (e.g., "population" → "demographics").
+- Narrow the scope (e.g., a specific state instead of the entire U.S.).
+- Browse available categories to see if a related dataset exists.
+`;

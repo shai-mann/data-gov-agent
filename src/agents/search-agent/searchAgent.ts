@@ -282,9 +282,14 @@ function shouldContinueToEval(state: typeof DatasetSearchAnnotation.State) {
 }
 
 function shouldContinueToModel(state: typeof DatasetSearchAnnotation.State) {
-  const { selectedDataset, pastQueries } = state;
+  const { selectedDataset, pastQueries, connectionId } = state;
 
   if (selectedDataset || pastQueries.length >= MAX_QUERY_COUNT) {
+    logSubState(
+      connectionId,
+      'DatasetSearch',
+      `Reached maximum query count of ${MAX_QUERY_COUNT}. Stopping search.`
+    );
     return END;
   }
 
