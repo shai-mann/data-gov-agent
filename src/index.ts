@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { coreAgent } from '@agents';
+import { coreAgent } from './agents/index.ts';
 import testing from './routes/testing';
 import agents from './routes/agents';
 

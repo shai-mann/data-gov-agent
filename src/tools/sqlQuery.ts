@@ -1,5 +1,5 @@
 import { tool } from 'langchain';
-import { conn } from '@lib/database';
+import { conn } from '../lib/database.ts';
 import { z } from 'zod';
 
 export const sqlQueryTool = tool(

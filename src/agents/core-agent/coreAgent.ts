@@ -5,16 +5,16 @@ import {
   START,
   StateGraph,
 } from '@langchain/langgraph';
-import { QueryAgentSummarySchema } from '@lib/annotation';
-import { openai } from '@llms';
+import { QueryAgentSummarySchema } from '../../lib/annotation.ts';
+import { openai } from '../../llms/index.ts';
 import { z } from 'zod';
-import { queryAgent, searchAgent } from '..';
-import { getPackage } from '@lib/data-gov';
+import { queryAgent, searchAgent } from '../index.ts';
+import { getPackage } from '../../lib/data-gov.ts';
 import {
   DATA_GOV_FINAL_EVALUATION_PROMPT,
   DATA_GOV_USER_QUERY_FORMATTING_PROMPT,
-} from './prompts';
-import { DatasetWithEvaluation } from '@agents/search-agent/searchAgent';
+} from './prompts.ts';
+import { DatasetWithEvaluation } from '../search-agent/searchAgent.ts';
 
 /*
 // TODO: Follow up on this comment - do I still need it?

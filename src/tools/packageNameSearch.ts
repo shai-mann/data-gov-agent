@@ -1,6 +1,6 @@
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
-import { packageAutocomplete } from '@lib/data-gov';
+import { packageAutocomplete } from '../lib/data-gov.ts';
 
 /**
  * Get a list of related package names to a query from data.gov

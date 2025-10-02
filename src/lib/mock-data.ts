@@ -1,4 +1,4 @@
-import { DatasetWithEvaluation } from '@agents/search-agent/searchAgent';
+import { DatasetWithEvaluation } from '../agents/search-agent/searchAgent.ts';
 
 export const MOCK_USER_QUERY = {
   query:

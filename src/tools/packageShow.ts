@@ -1,7 +1,7 @@
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
-import { getPackage } from '@lib/data-gov';
-import { PackageShowSchema } from '@lib/data-gov.schemas';
+import { getPackage } from '../lib/data-gov.ts';
+import { PackageShowSchema } from '../lib/data-gov.schemas.ts';
 
 /**
  * Get detailed metadata for a specific package (dataset) from data.gov

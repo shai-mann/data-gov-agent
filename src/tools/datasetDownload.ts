@@ -1,7 +1,7 @@
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
-import { ONE_SECOND } from '@lib/utils';
-import { workingDatasetMemory } from '@lib/database';
+import { ONE_SECOND } from '../lib/utils.ts';
+import { workingDatasetMemory } from '../lib/database.ts';
 
 export const VALID_DATASET_FORMATS = ['CSV'] as const;
 

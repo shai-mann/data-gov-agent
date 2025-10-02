@@ -1,11 +1,11 @@
 import { Annotation, END, Send, START, StateGraph } from '@langchain/langgraph';
-import { openai } from '@llms';
+import { openai } from '../../llms/index.ts';
 import { PendingResource, DatasetSummary, SummarySchema } from './annotations';
-import { PackageShowResponse } from '@lib/data-gov.schemas';
+import { PackageShowResponse } from '../../lib/data-gov.schemas.ts';
 import { DATA_GOV_SHALLOW_EVAL_SUMMATIVE_PROMPT } from './prompts';
-import { VALID_DATASET_FORMATS } from '@tools/datasetDownload';
+import { VALID_DATASET_FORMATS } from '../../tools/datasetDownload.ts';
 import { ResourceEvaluationAnnotation } from '../resource-eval-agent/resourceEvalAgent';
-import { resourceEvalAgent } from '..';
+import { resourceEvalAgent } from '../index.ts';
 import { ResourceEvaluation } from '../resource-eval-agent/annotations';
 
 /**

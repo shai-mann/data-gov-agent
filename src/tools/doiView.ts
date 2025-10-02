@@ -1,7 +1,7 @@
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import * as cheerio from 'cheerio';
-import { ONE_SECOND } from '@lib/utils';
+import { ONE_SECOND } from '../lib/utils.ts';
 import * as ExcelJS from 'exceljs';
 
 /**

@@ -12,19 +12,19 @@ import {
   QUERY_AGENT_SQL_REMINDER_PROMPT,
   QUERY_AGENT_TABLE_NAME_PROMPT,
 } from './prompts';
-import { QueryAgentSummarySchema } from '@lib/annotation';
-import { openai } from '@llms';
+import { QueryAgentSummarySchema } from '../../lib/annotation.ts';
+import { openai } from '../../llms/index.ts';
 import { ToolNode } from '@langchain/langgraph/prebuilt';
 import { AIMessage } from '@langchain/core/messages';
 import { z } from 'zod';
-import { datasetDownload } from '@tools/datasetDownload';
+import { datasetDownload } from '../../tools/datasetDownload.ts';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
-import { getLastAiMessageIndex, getToolMessages } from '@lib/utils';
-import { conn, workingDatasetMemory } from '@lib/database';
-import { sqlQueryTool } from '@tools';
-import { DatasetWithEvaluation } from '@agents/search-agent/searchAgent';
+import { getLastAiMessageIndex, getToolMessages } from '../../lib/utils.ts';
+import { conn, workingDatasetMemory } from '../../lib/database.ts';
+import { sqlQueryTool } from '../../tools/index.ts';
+import { DatasetWithEvaluation } from '../search-agent/searchAgent.ts';
 
 const MAX_QUERY_COUNT = 5;
 

@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
-import { searchAgent, evalAgent, queryAgent, resourceEvalAgent } from '@agents';
-import { packageShow, datasetDownload } from '@tools';
+import { searchAgent, evalAgent, queryAgent, resourceEvalAgent } from '../agents/index.ts';
+import { packageShow, datasetDownload } from '../tools/index.ts';
 import { ResourceEvaluation } from '../agents/resource-eval-agent/annotations';
 
 /**

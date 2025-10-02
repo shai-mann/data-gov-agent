@@ -1,12 +1,12 @@
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph';
-import { PendingResource } from '@agents/eval-agent/annotations';
-import { openai } from '@llms';
+import { PendingResource } from '../eval-agent/annotations';
+import { openai } from '../../llms/index.ts';
 import { z } from 'zod';
 import {
   DATA_GOV_DEEP_EVAL_SINGLE_RESOURCE_PROMPT,
   DATA_GOV_SHALLOW_EVAL_SINGLE_RESOURCE_PROMPT,
 } from './prompts';
-import { datasetDownload, doiView } from '@tools';
+import { datasetDownload, doiView } from '../../tools/index.ts';
 import { ResourceEvaluationSchema, ResourceEvaluation } from './annotations';
 
 /* ANNOTATIONS */

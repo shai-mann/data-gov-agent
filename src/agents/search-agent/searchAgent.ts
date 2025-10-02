@@ -7,15 +7,15 @@ import {
   StateGraph,
 } from '@langchain/langgraph';
 import { ToolNode } from '@langchain/langgraph/prebuilt';
-import { packageSearch, packageNameSearch, packageShow } from '@tools';
-import { openai } from '@llms';
+import { packageSearch, packageNameSearch, packageShow } from '../../tools/index.ts';
+import { openai } from '../../llms/index.ts';
 import {
   DATA_GOV_SEARCH_PROMPT,
   DATA_GOV_SEARCH_REMINDER_PROMPT as DATA_GOV_SEARCH_SELECTION_PROMPT,
 } from './prompts';
-import { getLastAiMessageIndex, getToolMessages } from '@lib/utils';
+import { getLastAiMessageIndex, getToolMessages } from '../../lib/utils.ts';
 import { z } from 'zod';
-import shallowEvalAgent from '@agents/eval-agent/evalAgent';
+import shallowEvalAgent from '../eval-agent/evalAgent.ts';
 import { DatasetSummary } from '../eval-agent/annotations';
 import { ResourceEvaluation } from '../resource-eval-agent/annotations';
 

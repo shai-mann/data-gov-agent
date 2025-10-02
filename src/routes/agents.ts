@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
-import { searchAgent, evalAgent, queryAgent } from '@agents';
-import { datasetDownload } from '@tools';
-import { DATA_GOV_USER_QUERY_FORMATTING_PROMPT } from '@agents/core-agent/prompts';
-import { openai } from '@llms';
+import { searchAgent, evalAgent, queryAgent } from '../agents/index.ts';
+import { datasetDownload } from '../tools/index.ts';
+import { DATA_GOV_USER_QUERY_FORMATTING_PROMPT } from '../agents/core-agent/prompts.ts';
+import { openai } from '../llms/index.ts';
 import { z } from 'zod';
 
 /**
