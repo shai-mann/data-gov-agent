@@ -17,6 +17,7 @@
     "forceConsistentCasingInFileNames": true,
     "allowJs": true,
     "types": ["bun-types"],
+    "baseUrl": "src",
     "paths": {
       "@lib/*": ["./src/lib/*"],
       "@agents/*": ["./src/agents/*"],
