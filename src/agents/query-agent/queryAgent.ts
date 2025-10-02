@@ -25,6 +25,7 @@ import { getLastAiMessageIndex, getToolMessages } from '@lib/utils';
 import { conn, workingDatasetMemory } from '@lib/database';
 import { sqlQueryTool } from '@tools';
 import { DatasetWithEvaluation } from '@agents/search-agent/searchAgent';
+import { logSubState } from '@lib/ws-logger';
 
 const MAX_QUERY_COUNT = 5;
 
@@ -42,6 +43,7 @@ const DatasetEvalAnnotation = Annotation.Root({
   userQuery: Annotation<string>,
   sqlQuery: Annotation<string>,
   summary: Annotation<z.infer<typeof QueryAgentSummarySchema>>,
+  connectionId: Annotation<string | undefined>(),
 });
 
 /* MODELS */
@@ -67,9 +69,14 @@ const tableNameStructuredModel = openai.withStructuredOutput(
  * Handles initializing the "database" (with DuckDB, in-mem), creating the table and populating it, and providing a preview of the dataset.
  */
 async function setupNode(state: typeof DatasetEvalAnnotation.State) {
-  const { dataset, userQuery } = state;
+  const { dataset, userQuery, connectionId } = state;
 
   console.log('🔍 [QUERY] Initializing...');
+  logSubState(
+    connectionId,
+    'DatasetQuery',
+    'Setting up database and loading dataset'
+  );
 
   // Find the resource being used by matching the URL
   const resource = dataset.evaluations.find(
@@ -85,6 +92,12 @@ async function setupNode(state: typeof DatasetEvalAnnotation.State) {
     await QUERY_AGENT_TABLE_NAME_PROMPT.formatMessages({
       dataset: resource.name,
     })
+  );
+
+  logSubState(
+    connectionId,
+    'DatasetQuery',
+    `Loading dataset into table: ${table}`
   );
 
   // Fetch the dataset (re-using the tool will result in using the cached data, since it must have been checked already)
@@ -115,6 +128,12 @@ async function setupNode(state: typeof DatasetEvalAnnotation.State) {
   if (!preview) {
     throw new Error('[QUERY] No preview could be generated.');
   }
+
+  logSubState(
+    connectionId,
+    'DatasetQuery',
+    'Dataset loaded, preparing to query'
+  );
 
   const prompt = await QUERY_AGENT_SQL_QUERY_PROMPT.formatMessages({
     tableName: table,
@@ -157,7 +176,7 @@ async function modelNode(state: typeof DatasetEvalAnnotation.State) {
  * Updates the query count after the SQL query tool is used.
  */
 async function postToolNode(state: typeof DatasetEvalAnnotation.State) {
-  const { messages, queryCount } = state;
+  const { messages, queryCount, connectionId } = state;
 
   const sqlQueryToolMessages = getToolMessages(
     messages,
@@ -165,9 +184,14 @@ async function postToolNode(state: typeof DatasetEvalAnnotation.State) {
     getLastAiMessageIndex(messages) + 1
   );
 
-  console.log(
-    '🔍 [QUERY] Post-tool node, query count is now at: ',
-    queryCount + sqlQueryToolMessages.length
+  const newCount = queryCount + sqlQueryToolMessages.length;
+
+  console.log('🔍 [QUERY] Post-tool node, query count is now at: ', newCount);
+
+  logSubState(
+    connectionId,
+    'DatasetQuery',
+    `Executed SQL query (${newCount}/${MAX_QUERY_COUNT})`
   );
 
   return {

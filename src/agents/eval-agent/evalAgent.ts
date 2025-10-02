@@ -28,6 +28,7 @@ const DatasetEvalAnnotation = Annotation.Root({
     default: () => [],
   }),
   summary: Annotation<DatasetSummary>,
+  connectionId: Annotation<string | undefined>(),
 });
 
 /* MODELS */

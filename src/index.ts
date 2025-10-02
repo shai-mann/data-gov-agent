@@ -1,13 +1,10 @@
 import { Hono } from 'hono';
 import { upgradeWebSocket, websocket } from 'hono/bun';
-import type { WSContext } from 'hono/ws';
 import { cors } from 'hono/cors';
 import { coreAgent } from '@agents';
 import testing from './routes/testing';
 import agents from './routes/agents';
-
-// Store active WebSocket connections by connection ID
-const wsConnections = new Map<string, WSContext>();
+import { registerWSConnection, logInfo, logError } from './lib/ws-logger';
 
 const app = new Hono();
 
@@ -25,22 +22,33 @@ app.route('/test', testing);
 app.route('/agents', agents);
 
 // WebSocket endpoint - clients connect here and receive a connection ID
+// Supports reconnection: pass ?connectionId=<existing-id> to reuse a connection ID
 app.get(
   '/ws',
-  upgradeWebSocket(() => {
-    const connectionId = crypto.randomUUID();
+  upgradeWebSocket(c => {
+    // Check if client wants to reuse an existing connection ID
+    const requestedConnectionId = c.req.query('connectionId');
+    const connectionId = requestedConnectionId || crypto.randomUUID();
+    const isReconnect = !!requestedConnectionId;
 
     return {
       onOpen(_event, ws) {
-        wsConnections.set(connectionId, ws);
-        ws.send(JSON.stringify({ type: 'connection', connectionId }));
-        console.log(`WebSocket connected: ${connectionId}`);
+        registerWSConnection(connectionId, ws);
+        ws.send(
+          JSON.stringify({
+            type: 'connection',
+            connectionId,
+            reconnected: isReconnect,
+          })
+        );
+        console.log(
+          `WebSocket ${isReconnect ? 'reconnected' : 'connected'}: ${connectionId}`
+        );
       },
       onMessage(event) {
         console.log(`Message from ${connectionId}:`, event.data);
       },
       onClose() {
-        wsConnections.delete(connectionId);
         console.log(`WebSocket disconnected: ${connectionId}`);
       },
       onError(event) {
@@ -64,60 +72,17 @@ app.post('/research', async c => {
       return c.json({ error: 'Query parameter is required' }, 400);
     }
 
-    // Helper function to send messages to the client via WebSocket
-    const sendToClient = (message: { type: string; data?: any }) => {
-      if (connectionId && wsConnections.has(connectionId)) {
-        const ws = wsConnections.get(connectionId);
-        ws?.send(JSON.stringify(message));
-      }
-    };
+    console.log('Connection ID:', connectionId);
 
-    sendToClient({ type: 'start', data: { query } });
+    // Log the start of the research
+    logInfo(connectionId, 'Starting research query', { query });
 
-    const result = await coreAgent.invoke(
-      {
-        userQuery: query,
-      },
-      {
-        callbacks: [
-          {
-            handleChainStart(
-              _chain,
-              _inputs,
-              _runId,
-              _parentRunId,
-              _tags,
-              _metadata,
-              runName
-            ) {
-              sendToClient({ type: 'chain_start', data: { runName } });
-            },
-            handleChainEnd(_outputs, _runId, _parentRunId, _tags, runName) {
-              sendToClient({ type: 'chain_end', data: { runName } });
-            },
-            handleToolStart(
-              _tool,
-              _input,
-              _runId,
-              _parentRunId,
-              _tags,
-              _metadata,
-              name
-            ) {
-              sendToClient({ type: 'tool_start', data: { name } });
-            },
-            handleToolEnd(output, runId, parentRunId, tags) {
-              sendToClient({
-                type: 'tool_end',
-                data: { output, runId, parentRunId, tags },
-              });
-            },
-          },
-        ],
-      }
-    );
+    const result = await coreAgent.invoke({
+      userQuery: query,
+      connectionId,
+    });
 
-    sendToClient({ type: 'complete', data: { result: result.output } });
+    logInfo(connectionId, 'Research complete', { result: result.output });
 
     return c.json({
       success: true,
@@ -125,6 +90,14 @@ app.post('/research', async c => {
     });
   } catch (error) {
     console.error('Data Gov Agent error:', error);
+
+    // Log error to WebSocket if connection exists
+    const { connectionId } = await c.req.json();
+    logError(
+      connectionId,
+      error instanceof Error ? error : new Error(String(error))
+    );
+
     return c.json(
       {
         success: false,
