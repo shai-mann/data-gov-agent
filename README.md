@@ -6,6 +6,8 @@
 
 An agentic microservice that turns natural language questions into actual answers using the treasure trove of data hiding in plain sight on data.gov. Built with Hono, Bun, LangGraph, and a healthy dose of multi-agent orchestration.
 
+*If you're looking for the UI repository, it's right [here](https://github.com/shai-mann/data-gov-ui)*
+
 ## What Does This Thing Actually Do?
 
 You ask it a question like "What's the average household income in California?" and instead of shrugging or hallucinating, it:
